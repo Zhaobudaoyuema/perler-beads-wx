@@ -30,7 +30,9 @@ Page({
     usedColorCount: 0,
     hasResult: false,
     bgRemoved: false,
+    stale: false,
     usageList: [],
+    previewScale: '1.0',
 
     // 状态
     processing: false,
@@ -57,15 +59,34 @@ Page({
 
   onBrandChange(e) {
     this.setData({ brandIndex: Number(e.detail.value) });
+    this._markStale();
   },
   onModeChange(e) {
     this.setData({ modeIndex: Number(e.detail.value) });
+    this._markStale();
   },
   onGridNChange(e) {
     this.setData({ gridN: Number(e.detail.value) });
+    this._markStale();
   },
   onMergeThresholdChange(e) {
     this.setData({ mergeThreshold: Number(e.detail.value) });
+    this._markStale();
+  },
+
+  _markStale() {
+    if (this.data.hasResult && !this.data.stale) {
+      this.setData({ stale: true });
+    }
+  },
+
+  onPreviewScale(e) {
+    const s = e && e.detail && e.detail.scale;
+    if (typeof s !== 'number') return;
+    const display = s.toFixed(1);
+    if (display !== this.data.previewScale) {
+      this.setData({ previewScale: display });
+    }
   },
 
   // ==================== 选图 ====================
@@ -90,6 +111,7 @@ Page({
           tempFilePath: file.tempFilePath,
           hasResult: false,
           bgRemoved: false,
+          stale: false,
           usageList: [],
           imageInfo: null
         });
@@ -235,7 +257,8 @@ Page({
       totalBeads: total,
       usedColorCount,
       usageList,
-      hasResult: true
+      hasResult: true,
+      stale: false
     });
   },
 
@@ -559,11 +582,11 @@ Page({
         });
       });
       await this._saveToAlbum(tempPath);
-      wx.showToast({ title: '已保存到相册', icon: 'success' });
-    } catch (err) {
-      this._handleSaveError(err);
-    } finally {
       wx.hideLoading();
+      this._afterSaveSuccess(tempPath, '图纸');
+    } catch (err) {
+      wx.hideLoading();
+      this._handleSaveError(err);
     }
   },
 
@@ -576,12 +599,26 @@ Page({
     try {
       const tempPath = await this._renderAndExportList();
       await this._saveToAlbum(tempPath);
-      wx.showToast({ title: '已保存到相册', icon: 'success' });
-    } catch (err) {
-      this._handleSaveError(err);
-    } finally {
       wx.hideLoading();
+      this._afterSaveSuccess(tempPath, '采购清单');
+    } catch (err) {
+      wx.hideLoading();
+      this._handleSaveError(err);
     }
+  },
+
+  _afterSaveSuccess(tempPath, label) {
+    wx.showModal({
+      title: '已保存到相册',
+      content: label + '已保存，可立即预览或前往相册查看',
+      confirmText: '立即预览',
+      cancelText: '关闭',
+      success(r) {
+        if (r.confirm) {
+          wx.previewImage({ urls: [tempPath], current: tempPath });
+        }
+      }
+    });
   },
 
   async _renderAndExportList() {
@@ -719,5 +756,21 @@ Page({
     if (msg.indexOf('cancel') !== -1 || msg.indexOf('已取消') !== -1) return;
     wx.showToast({ title: '保存失败', icon: 'none' });
     console.error('[Save] error', err);
+  },
+
+  // ==================== 分享 ====================
+
+  onShareAppMessage() {
+    return {
+      title: '我用拼豆图纸生成器做了个图纸',
+      path: '/pages/index/index'
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: '拼豆图纸生成器 — 任意图片一键生成拼豆底稿',
+      query: ''
+    };
   }
 });

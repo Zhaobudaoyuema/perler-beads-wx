@@ -70,13 +70,24 @@ npm run dev
 
 色板数据定义在 [`src/app/colorSystemMapping.json`](src/app/colorSystemMapping.json)，包含 291 种标准颜色到 5 个品牌色号体系的完整映射。色板组合在 [`src/app/page.tsx`](src/app/page.tsx) 的 `paletteOptions` 中配置。
 
+## 微信小程序版
+
+原生微信小程序版本位于 [`miniprogram/`](./miniprogram/) 目录，已实现核心功能：
+
+- 图片上传 · 5 大品牌色号 · 卡通/真实双模式
+- 杂色合并阈值 · 一键去背景（边界洪水填充）
+- 颜色排除与重映射 · 双指缩放预览
+- 一键导出图纸 / 采购清单 PNG 到相册
+
+调试方式：用「微信开发者工具」导入 [`miniprogram/`](./miniprogram/) 目录即可（AppID 选「测试号」）。详见 [`miniprogram/README.md`](./miniprogram/README.md)。
+
 ## Roadmap
 
 - [ ] CIEDE2000 (Delta E) 颜色距离算法，替代 RGB 欧氏距离
 - [ ] Floyd-Steinberg 抖动，在有限色板下模拟更丰富的颜色过渡
 - [ ] Web Workers 后台计算，优化大图性能
 - [ ] 用户自定义调色板上传
-- [ ] 微信小程序版本
+- [x] 微信小程序版本
 
 ## 参与贡献
 

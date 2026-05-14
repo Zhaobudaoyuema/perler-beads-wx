@@ -93,20 +93,39 @@
     <view wx:if="{{hasResult}}" class="result-meta">
       已生成 {{gridN}} × {{gridM}} 格 · 共 {{totalBeads}} 颗豆 · {{usedColorCount}} 种色号
     </view>
+    <view wx:if="{{stale}}" class="stale-hint">参数已修改，点击「生成图纸」更新</view>
   </view>
 
   <!-- 预览 + 导出（canvas 始终在 DOM 中，确保 selectorQuery 可用） -->
   <view class="card preview-card">
-    <view class="card-title">预览</view>
+    <view class="card-title">
+      <text>预览</text>
+      <text wx:if="{{hasResult}}" class="preview-zoom-hint">双指缩放 · 拖动查看 · 当前 {{previewScale}}x</text>
+    </view>
     <view wx:if="{{!hasResult}}" class="preview-empty">生成后在此处查看图纸</view>
-    <scroll-view class="preview-scroll {{hasResult ? '' : 'preview-scroll-hidden'}}" scroll-x scroll-y enable-flex>
-      <canvas
-        type="2d"
-        id="previewCanvas"
-        class="preview-canvas"
+    <movable-area
+      class="preview-area {{hasResult ? '' : 'preview-area-hidden'}}"
+      scale-area
+    >
+      <movable-view
+        class="preview-mv"
+        direction="all"
+        inertia
+        scale
+        scale-min="1"
+        scale-max="4"
+        scale-value="1"
+        bindscale="onPreviewScale"
         style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
-      ></canvas>
-    </scroll-view>
+      >
+        <canvas
+          type="2d"
+          id="previewCanvas"
+          class="preview-canvas"
+          style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
+        ></canvas>
+      </movable-view>
+    </movable-area>
 
     <view class="action-row" wx:if="{{hasResult}}">
       <button class="btn-tool {{bgRemoved ? 'btn-tool-active' : ''}}" bindtap="onToggleBgRemove">
