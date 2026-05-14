@@ -1,0 +1,20 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "拼豆图纸生成器",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f6f8"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "permission": {
+    "scope.writePhotosAlbum": {
+      "desc": "用于保存生成的拼豆图纸和采购清单到相册"
+    }
+  }
+}

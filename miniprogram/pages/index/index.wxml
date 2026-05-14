@@ -1,0 +1,106 @@
+<view class="page">
+  <!-- 顶部品牌区 -->
+  <view class="hero">
+    <view class="hero-title">拼豆图纸生成器</view>
+    <view class="hero-sub">任意图片 → 拼豆底稿，一键生成</view>
+  </view>
+
+  <!-- 步骤一：选图 -->
+  <view class="card">
+    <view class="card-title">1. 选择图片</view>
+    <view class="upload-zone" bindtap="onChooseImage">
+      <block wx:if="{{tempFilePath}}">
+        <image class="thumb" src="{{tempFilePath}}" mode="aspectFit"></image>
+        <view class="thumb-hint">点击重新选择</view>
+      </block>
+      <block wx:else>
+        <view class="upload-icon">+</view>
+        <view class="upload-text">点击上传图片</view>
+        <view class="upload-sub">支持相册或拍照</view>
+      </block>
+    </view>
+    <view wx:if="{{imageInfo}}" class="meta">
+      原图 {{imageInfo.width}} × {{imageInfo.height}} px
+    </view>
+  </view>
+
+  <!-- 步骤二：配置参数 -->
+  <view class="card">
+    <view class="card-title">2. 配置参数</view>
+
+    <view class="form-row">
+      <view class="form-label">色号品牌</view>
+      <picker class="picker" range="{{brandNames}}" value="{{brandIndex}}" bindchange="onBrandChange">
+        <view class="picker-value">{{brandNames[brandIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row">
+      <view class="form-label">像素化模式</view>
+      <picker class="picker" range="{{modeNames}}" value="{{modeIndex}}" bindchange="onModeChange">
+        <view class="picker-value">{{modeNames[modeIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="form-row form-row-block">
+      <view class="form-row-line">
+        <view class="form-label">横向格数 N</view>
+        <view class="form-value">{{gridN}}</view>
+      </view>
+      <slider
+        class="slider"
+        min="20"
+        max="80"
+        step="1"
+        value="{{gridN}}"
+        activeColor="#7c5cff"
+        block-size="22"
+        bindchange="onGridNChange"
+      />
+      <view class="form-hint">纵向 M 自动按图片比例计算</view>
+    </view>
+  </view>
+
+  <!-- 步骤三：生成 -->
+  <view class="card">
+    <view class="card-title">3. 生成图纸</view>
+    <button
+      class="btn-primary {{!tempFilePath || processing ? 'btn-disabled' : ''}}"
+      disabled="{{!tempFilePath || processing}}"
+      bindtap="onGenerate"
+    >
+      {{processing ? '处理中…' : '生成图纸'}}
+    </button>
+
+    <view wx:if="{{hasResult}}" class="result-meta">
+      已生成 {{gridN}} × {{gridM}} 格 · 共 {{totalBeads}} 颗豆 · {{usedColorCount}} 种色号
+    </view>
+  </view>
+
+  <!-- 预览 + 导出（canvas 始终在 DOM 中，确保 selectorQuery 可用） -->
+  <view class="card preview-card">
+    <view class="card-title">预览</view>
+    <view wx:if="{{!hasResult}}" class="preview-empty">生成后在此处查看图纸</view>
+    <scroll-view class="preview-scroll {{hasResult ? '' : 'preview-scroll-hidden'}}" scroll-x scroll-y enable-flex>
+      <canvas
+        type="2d"
+        id="previewCanvas"
+        class="preview-canvas"
+        style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
+      ></canvas>
+    </scroll-view>
+
+    <view class="export-row" wx:if="{{hasResult}}">
+      <button class="btn-secondary" bindtap="onSavePoster">保存图纸</button>
+      <button class="btn-secondary" bindtap="onSaveList">保存采购清单</button>
+    </view>
+  </view>
+
+  <!-- 离屏 canvas（type=2d 不能 hidden，因此移出屏幕外） -->
+  <view class="offscreen">
+    <canvas type="2d" id="srcCanvas" style="width:{{srcCssW}}px; height:{{srcCssH}}px;"></canvas>
+    <canvas type="2d" id="listCanvas" style="width:{{listCssW}}px; height:{{listCssH}}px;"></canvas>
+  </view>
+
+  <view class="footer">基于 Zippland/perler-beads 移植 · MIT 内核 / AGPL 项目</view>
+</view>
