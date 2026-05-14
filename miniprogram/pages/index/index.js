@@ -1389,6 +1389,46 @@ Page({
     console.error('[Save] error', err);
   },
 
+  // ==================== 专注模式 ====================
+
+  onEnterFocusMode() {
+    if (!this.data.hasResult || !this._mappedData) {
+      wx.showToast({ title: '请先生成图纸', icon: 'none' });
+      return;
+    }
+    // 拍快照（深拷贝）：mappedData / N / M / brand / palette / imgKey
+    const N = this._currentN;
+    const M = this._currentM;
+    const palette = (this._currentPalette || []).map(p => ({ key: p.key, hex: p.hex }));
+    const mappedSnap = this._mappedData.map(row => row.map(c => ({
+      key: c.key,
+      color: c.color,
+      isExternal: !!c.isExternal
+    })));
+    // imgKey: 用 tempFilePath 末尾哈希作为图纸 id
+    const path = this.data.tempFilePath || '';
+    let h = 0;
+    for (let i = 0; i < path.length; i++) h = ((h << 5) - h) + path.charCodeAt(i) | 0;
+    const imgKey = 'k_' + Math.abs(h) + '_' + N + 'x' + M + '_' + (this._currentBrand || 'na');
+
+    try {
+      wx.setStorageSync('focus_session', {
+        mappedData: mappedSnap,
+        N,
+        M,
+        brand: this._currentBrand || '',
+        palette,
+        imgKey,
+        ts: Date.now()
+      });
+    } catch (e) {
+      console.error('[Focus] save session failed', e);
+      wx.showToast({ title: '会话保存失败', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/focus/focus' });
+  },
+
   // ==================== 分享 ====================
 
   onShareAppMessage() {

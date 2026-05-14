@@ -1,0 +1,364 @@
+page {
+  background: #0f0f14;
+}
+.focus-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16rpx 16rpx 0;
+  box-sizing: border-box;
+}
+
+/* -------- 顶部 -------- */
+.focus-top {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 16rpx;
+  padding: 16rpx;
+  margin-bottom: 12rpx;
+}
+.focus-top-row {
+  display: flex;
+  align-items: stretch;
+  gap: 12rpx;
+}
+.cur-color-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12rpx;
+  padding: 12rpx;
+}
+.cur-swatch {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 14rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.18);
+  margin-right: 14rpx;
+  flex-shrink: 0;
+}
+.cur-info {
+  display: flex;
+  flex-direction: column;
+}
+.cur-key {
+  color: #fff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.cur-meta {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 22rpx;
+  margin-top: 4rpx;
+  font-variant-numeric: tabular-nums;
+}
+.timer-card {
+  width: 200rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12rpx;
+  padding: 12rpx;
+}
+.timer-value {
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1rpx;
+}
+.timer-btns {
+  display: flex;
+  gap: 8rpx;
+  margin-top: 6rpx;
+}
+.timer-btn {
+  color: #c7b5ff;
+  font-size: 22rpx;
+  background: rgba(124, 92, 255, 0.18);
+  border-radius: 8rpx;
+  padding: 4rpx 14rpx;
+}
+.timer-btn:active {
+  background: rgba(124, 92, 255, 0.32);
+}
+
+.progress-row {
+  margin-top: 14rpx;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+.progress-bar {
+  flex: 1;
+  height: 14rpx;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999rpx;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c5cff, #5b8cff);
+  border-radius: 999rpx;
+  transition: width 0.2s;
+}
+.progress-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 22rpx;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* -------- 画布舞台 -------- */
+.focus-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rpx 0;
+  min-height: 400rpx;
+}
+.focus-area {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.32);
+}
+.focus-mv {
+  background: #fff;
+}
+.focus-canvas {
+  display: block;
+}
+
+/* -------- 操作区 -------- */
+.focus-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 12rpx 0;
+  padding: 0 4rpx;
+}
+.action-segment {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 12rpx;
+  padding: 8rpx 12rpx;
+}
+.seg-title {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 22rpx;
+  margin-right: 10rpx;
+}
+.seg-btns {
+  display: flex;
+  gap: 6rpx;
+  flex: 1;
+}
+.seg-btn {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 8rpx 0;
+  border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.04);
+}
+.seg-btn-on {
+  background: linear-gradient(135deg, #7c5cff, #5b8cff);
+  color: #fff;
+  font-weight: 600;
+}
+.action-buttons {
+  display: flex;
+  gap: 8rpx;
+}
+.action-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 22rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 18rpx;
+  border-radius: 12rpx;
+  border: none;
+}
+.action-btn::after {
+  border: none;
+}
+
+/* -------- 底部色板 -------- */
+.focus-palette {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12rpx;
+  padding: 10rpx;
+  margin-bottom: 8rpx;
+}
+.palette-scroll {
+  white-space: nowrap;
+  width: 100%;
+}
+.palette-strip {
+  display: inline-flex;
+  padding: 4rpx 0 8rpx;
+}
+.palette-chip {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999rpx;
+  padding: 8rpx 16rpx 8rpx 8rpx;
+  margin-right: 10rpx;
+  border: 2rpx solid transparent;
+}
+.palette-chip:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+.palette-chip-on {
+  background: rgba(124, 92, 255, 0.28);
+  border-color: #7c5cff;
+}
+.palette-chip-done {
+  opacity: 0.55;
+}
+.palette-swatch {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
+  margin-right: 8rpx;
+}
+.palette-key {
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+.palette-count {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 20rpx;
+  margin-left: 6rpx;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------- 离屏 canvas -------- */
+.offscreen {
+  position: fixed;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* -------- picker / sheet（共用主页风格，深色版） -------- */
+.picker-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
+}
+.picker-mask-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.picker-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #1f1f23;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 24rpx;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  z-index: 101;
+  max-height: 72vh;
+}
+.picker-sheet-on {
+  transform: translateY(0);
+}
+.picker-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+}
+.picker-close {
+  font-size: 26rpx;
+  color: #a899ff;
+  padding: 4rpx 12rpx;
+}
+.settings-body {
+  display: flex;
+  flex-direction: column;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.06);
+}
+.settings-row:first-child {
+  border-top: none;
+}
+.settings-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-right: 16rpx;
+}
+.settings-name {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+.settings-desc {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 22rpx;
+  margin-top: 4rpx;
+}
+.settings-action {
+  color: #ff9333;
+  font-size: 26rpx;
+  background: rgba(255, 147, 51, 0.12);
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+}
+.picker {
+  text-align: right;
+}
+.picker-value {
+  color: #fff;
+  font-size: 26rpx;
+  padding: 8rpx 16rpx;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+}
+.picker-arrow {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 28rpx;
+  line-height: 1;
+}
+.picker-color-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  border: 1rpx solid rgba(255, 255, 255, 0.3);
+  margin-right: 6rpx;
+}

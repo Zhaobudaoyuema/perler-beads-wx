@@ -210,6 +210,12 @@
       <button class="btn-secondary" bindtap="onOpenExportSheet">保存图纸</button>
       <button class="btn-secondary" bindtap="onSaveList">保存采购清单</button>
     </view>
+    <view class="export-row" wx:if="{{hasResult}}">
+      <button class="btn-focus" bindtap="onEnterFocusMode">
+        <text class="btn-focus-icon">●</text>
+        进入专注模式（按色拼豆）
+      </button>
+    </view>
   </view>
 
   <!-- 离屏 canvas（type=2d 不能 hidden，因此移出屏幕外） -->

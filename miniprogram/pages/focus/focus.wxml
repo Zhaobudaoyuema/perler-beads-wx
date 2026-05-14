@@ -1,0 +1,148 @@
+<view class="focus-page" style="padding-bottom: calc(16rpx + {{safeBottom}}px);">
+
+  <!-- 顶部进度条 + 计时 + 当前色 -->
+  <view class="focus-top">
+    <view class="focus-top-row">
+      <view class="cur-color-card">
+        <view class="cur-swatch" style="background:{{currentHex}}"></view>
+        <view class="cur-info">
+          <text class="cur-key">{{currentKey || '未选色号'}}</text>
+          <text class="cur-meta">{{currentDoneCount}}/{{currentTotal}}</text>
+        </view>
+      </view>
+      <view class="timer-card">
+        <text class="timer-value">{{timerText}}</text>
+        <view class="timer-btns">
+          <view class="timer-btn" bindtap="onToggleTimer">{{paused ? '继续' : '暂停'}}</view>
+          <view class="timer-btn" bindtap="onResetTimer">重置</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="progress-row">
+      <view class="progress-bar">
+        <view class="progress-fill" style="width:{{progressPercent}}%"></view>
+      </view>
+      <text class="progress-text">{{completedCount}} / {{totalCells}}（{{progressPercent}}%）</text>
+    </view>
+  </view>
+
+  <!-- 中间：FocusCanvas -->
+  <view class="focus-stage">
+    <movable-area
+      class="focus-area"
+      scale-area
+      style="width:{{areaW}}px; height:{{areaH}}px;"
+    >
+      <movable-view
+        class="focus-mv"
+        direction="all"
+        inertia
+        scale
+        scale-min="1"
+        scale-max="6"
+        scale-value="1"
+        style="width:{{cssW}}px; height:{{cssH}}px;"
+      >
+        <canvas
+          type="2d"
+          id="focusCanvas"
+          class="focus-canvas"
+          style="width:{{cssW}}px; height:{{cssH}}px;"
+          bindtouchstart="onCanvasTouchStart"
+          bindtouchmove="onCanvasTouchMove"
+          bindtouchend="onCanvasTouchEnd"
+          bindtouchcancel="onCanvasTouchCancel"
+        ></canvas>
+      </movable-view>
+    </movable-area>
+  </view>
+
+  <!-- 引导推荐 + 设置 -->
+  <view class="focus-actions">
+    <view class="action-segment">
+      <view class="seg-title">引导：</view>
+      <view class="seg-btns">
+        <view class="seg-btn {{guideMode === 'nearest' ? 'seg-btn-on' : ''}}" data-mode="nearest" bindtap="onSelectGuideMode">最近</view>
+        <view class="seg-btn {{guideMode === 'largest' ? 'seg-btn-on' : ''}}" data-mode="largest" bindtap="onSelectGuideMode">最大</view>
+        <view class="seg-btn {{guideMode === 'edge' ? 'seg-btn-on' : ''}}" data-mode="edge" bindtap="onSelectGuideMode">边缘</view>
+      </view>
+    </view>
+    <view class="action-buttons">
+      <button class="action-btn" bindtap="onJumpToNextRegion">下一推荐</button>
+      <button class="action-btn" bindtap="onOpenSettings">设置</button>
+    </view>
+  </view>
+
+  <!-- 底部色板（可滚动） -->
+  <view class="focus-palette">
+    <scroll-view class="palette-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="palette-strip">
+        <view
+          class="palette-chip {{currentKey === item.key ? 'palette-chip-on' : ''}} {{item.done ? 'palette-chip-done' : ''}}"
+          wx:for="{{paletteList}}"
+          wx:key="key"
+          data-key="{{item.key}}"
+          bindtap="onTapPaletteChip"
+        >
+          <view class="palette-swatch" style="background:{{item.hex}}"></view>
+          <text class="palette-key">{{item.key}}</text>
+          <text class="palette-count">{{item.done}}/{{item.total}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 离屏 canvas 用于完成打卡 -->
+  <view class="offscreen">
+    <canvas type="2d" id="completionCanvas" style="width:{{completionCssW}}px; height:{{completionCssH}}px;"></canvas>
+  </view>
+
+  <!-- 设置弹层 -->
+  <view class="picker-mask {{settingsVisible ? 'picker-mask-on' : ''}}" catchtap="onCloseSettings"></view>
+  <view class="picker-sheet {{settingsVisible ? 'picker-sheet-on' : ''}}" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
+    <view class="picker-header">
+      <text class="picker-title">专注模式设置</text>
+      <text class="picker-close" bindtap="onCloseSettings">完成</text>
+    </view>
+    <view class="settings-body">
+      <view class="settings-row">
+        <view class="settings-label">
+          <text class="settings-name">分隔线间隔</text>
+          <text class="settings-desc">每 {{gridIntervalOptions[gridIntervalIndex]}} 格画一条粗线</text>
+        </view>
+        <picker class="picker" range="{{gridIntervalOptions}}" value="{{gridIntervalIndex}}" bindchange="onChangeGridInterval">
+          <view class="picker-value">{{gridIntervalOptions[gridIntervalIndex]}} <text class="picker-arrow">›</text></view>
+        </picker>
+      </view>
+      <view class="settings-row">
+        <view class="settings-label">
+          <text class="settings-name">分隔线颜色</text>
+          <text class="settings-desc">{{gridColorOptions[gridColorIndex].label}}</text>
+        </view>
+        <picker class="picker" range="{{gridColorLabels}}" value="{{gridColorIndex}}" bindchange="onChangeGridColor">
+          <view class="picker-value">
+            <view class="picker-color-dot" style="background:{{gridColorOptions[gridColorIndex].value}}"></view>
+            {{gridColorOptions[gridColorIndex].label}}
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+      <view class="settings-row">
+        <view class="settings-label">
+          <text class="settings-name">完成时庆祝弹窗</text>
+          <text class="settings-desc">完成全部时显示打卡引导</text>
+        </view>
+        <switch checked="{{celebrateEnabled}}" color="#7c5cff" bindchange="onToggleCelebrate"/>
+      </view>
+      <view class="settings-row">
+        <view class="settings-label">
+          <text class="settings-name">已完成进度</text>
+          <text class="settings-desc">本图纸：{{completedCount}}/{{totalCells}}</text>
+        </view>
+        <view class="settings-action" bindtap="onResetProgress">重置进度</view>
+      </view>
+    </view>
+  </view>
+
+</view>
