@@ -53,7 +53,7 @@
       <slider
         class="slider"
         min="20"
-        max="80"
+        max="120"
         step="1"
         value="{{gridN}}"
         activeColor="#7c5cff"
@@ -62,7 +62,7 @@
         block-size="20"
         bindchange="onGridNChange"
       />
-      <view class="form-hint">纵向 M 按图片比例自动计算</view>
+      <view class="form-hint">纵向 M 按图片比例自动计算<text wx:if="{{gridN > 80}}" class="form-hint-warn"> · ⚠️ {{gridN}} 格较大，处理可能稍慢</text></view>
     </view>
 
     <view class="form-row form-row-block">
@@ -159,11 +159,34 @@
       点击格子可{{eraseMode ? '擦除' : '更改色号'}}；缩放图纸时点击无效
     </view>
 
+    <!-- 已排除色号（B2.3 单色恢复） -->
+    <view class="usage-section" wx:if="{{hasResult && excludedList.length}}">
+      <view class="usage-title">
+        <text>已排除</text>
+        <text class="usage-meta">{{excludedList.length}} 种 · 点击单独恢复</text>
+      </view>
+      <scroll-view class="usage-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="usage-strip">
+          <view
+            class="usage-chip excluded-chip"
+            wx:for="{{excludedList}}"
+            wx:key="hex"
+            data-hex="{{item.hex}}"
+            bindtap="onTapExcludedChip"
+          >
+            <view class="usage-swatch excluded-swatch" style="background:{{item.hex}}"></view>
+            <text class="usage-key">{{item.key}}</text>
+            <text class="usage-restore">↺</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
     <!-- 色板用量条 -->
     <view class="usage-section" wx:if="{{hasResult && usageList.length}}">
       <view class="usage-title">
         <text>色板用量</text>
-        <text class="usage-meta">{{usageList.length}} 种 · {{totalBeads}} 颗 · 点击可排除</text>
+        <text class="usage-meta">{{usageList.length}} 种 · {{totalBeads}} 颗 · 点击操作</text>
       </view>
       <scroll-view class="usage-scroll" scroll-x enhanced show-scrollbar="{{false}}">
         <view class="usage-strip">
@@ -269,7 +292,7 @@
   <view class="picker-mask {{pickerVisible ? 'picker-mask-on' : ''}}" catchtap="onClosePicker"></view>
   <view class="picker-sheet {{pickerVisible ? 'picker-sheet-on' : ''}}" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
     <view class="picker-header">
-      <text class="picker-title">选择色号</text>
+      <text class="picker-title">{{pickerMode === 'batchReplace' ? '替换为' : '选择色号'}}</text>
       <text class="picker-meta">{{pickerCellInfo}}</text>
       <text class="picker-close" bindtap="onClosePicker">取消</text>
     </view>

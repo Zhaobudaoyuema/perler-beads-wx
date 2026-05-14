@@ -48,6 +48,8 @@ Page({
     pickerVisible: false,
     pickerList: [],
     pickerCellInfo: '',
+    pickerMode: 'cell', // 'cell' | 'batchReplace'
+    excludedList: [],
 
     // 状态
     processing: false,
@@ -169,6 +171,7 @@ Page({
           bgRemoved: false,
           stale: false,
           usageList: [],
+          excludedList: [],
           imageInfo: null
         });
         wx.getImageInfo({
@@ -204,7 +207,7 @@ Page({
       this._bgSnapshot = null;
       this._editHistory = [];
       this._selectedCell = null;
-      this.setData({ canUndo: false, eraseMode: false, pickerVisible: false });
+      this.setData({ canUndo: false, eraseMode: false, pickerVisible: false, excludedList: [] });
 
       // 1. 拿原图 ImageData（带缓存：同一张图复用）
       const imageData = await this._ensureImageData();
@@ -338,6 +341,21 @@ Page({
     }
     const last = this._editHistory.pop();
     if (!last || !this._mappedData) return;
+
+    if (last.type === 'batchReplace' && Array.isArray(last.edits)) {
+      // 批量恢复
+      last.edits.forEach(({ i, j, prev }) => {
+        if (this._mappedData[j] && this._mappedData[j][i]) {
+          this._mappedData[j][i] = prev;
+          this._drawCell(i, j, prev, false);
+        }
+      });
+      this._recomputeUsageAndCount();
+      this.setData({ canUndo: this._editHistory.length > 0 });
+      wx.showToast({ title: '已恢复 ' + last.edits.length + ' 格', icon: 'none' });
+      return;
+    }
+
     const { i, j, prev } = last;
     if (!this._mappedData[j] || !this._mappedData[j][i]) return;
     this._mappedData[j][i] = prev;
@@ -458,15 +476,24 @@ Page({
     }
     this._selectedCell = null;
     this._pickerCell = null;
-    this.setData({ pickerVisible: false });
+    this._batchReplaceCtx = null;
+    this.setData({ pickerVisible: false, pickerMode: 'cell' });
   },
 
   onTapPickerColor(e) {
-    if (!this._pickerCell) return;
     const idx = Number(e.currentTarget.dataset.idx);
     const palette = this._currentPalette || [];
     const picked = palette[idx];
     if (!picked) return;
+
+    if (this.data.pickerMode === 'batchReplace') {
+      this._doBatchReplace(picked);
+      this._batchReplaceCtx = null;
+      this.setData({ pickerVisible: false, pickerMode: 'cell' });
+      return;
+    }
+
+    if (!this._pickerCell) return;
     const { i, j } = this._pickerCell;
     this._applyEdit(i, j, {
       key: picked.key,
@@ -540,13 +567,126 @@ Page({
     if (!key || !hex) return;
     const that = this;
     wx.showActionSheet({
-      itemList: ['排除色号 ' + key + '（用其他色替代）'],
+      itemList: [
+        '在图上高亮 ' + key,
+        '替换为其他色号',
+        '排除色号 ' + key + '（用其他色替代）'
+      ],
       success(res) {
         if (res.tapIndex === 0) {
+          that._highlightColorInGrid(key);
+        } else if (res.tapIndex === 1) {
+          that._openBatchReplace(key, hex);
+        } else if (res.tapIndex === 2) {
           that._excludeColor(hex.toUpperCase());
         }
       }
     });
+  },
+
+  /**
+   * 整色批量替换（B2.1）：打开 picker 选目标，遇到原 key 全替换
+   */
+  _openBatchReplace(srcKey, srcHex) {
+    const palette = this._currentPalette || [];
+    if (palette.length === 0) return;
+    this._pickerCell = null;
+    this._batchReplaceCtx = { srcKey: srcKey, srcHex: (srcHex || '').toUpperCase() };
+    this.setData({
+      pickerVisible: true,
+      pickerMode: 'batchReplace',
+      pickerList: palette,
+      pickerCellInfo: '替换 ' + srcKey + ' → ?'
+    });
+  },
+
+  _doBatchReplace(picked) {
+    const ctx = this._batchReplaceCtx;
+    if (!ctx || !this._mappedData) return;
+    const { srcKey } = ctx;
+    if (!picked || picked.key === srcKey) {
+      wx.showToast({ title: '未变更', icon: 'none' });
+      return;
+    }
+    const N = this._currentN, M = this._currentM;
+    // 先把所有受影响的 (i,j) 收集为一条复合编辑（push history 占一格成本）
+    const edits = [];
+    for (let j = 0; j < M; j++) {
+      const row = this._mappedData[j];
+      if (!row) continue;
+      for (let i = 0; i < N; i++) {
+        const c = row[i];
+        if (!c || c.isExternal) continue;
+        if (c.key === srcKey) {
+          edits.push({ i, j, prev: Object.assign({}, c) });
+          row[i] = { key: picked.key, color: picked.hex, isExternal: false };
+        }
+      }
+    }
+    if (edits.length === 0) {
+      wx.showToast({ title: '未找到 ' + srcKey, icon: 'none' });
+      return;
+    }
+    this._editHistory = this._editHistory || [];
+    this._editHistory.push({ type: 'batchReplace', edits });
+    // 重绘所有变更的 cell
+    edits.forEach(({ i, j }) => {
+      this._drawCell(i, j, this._mappedData[j][i], false);
+    });
+    this._recomputeUsageAndCount();
+    this.setData({ canUndo: true });
+    wx.showToast({ title: '已替换 ' + edits.length + ' 格', icon: 'success' });
+  },
+
+  /**
+   * 色号高亮闪烁（B2.2）：所有该 key 的 cell 加红框，1.5s 后恢复
+   */
+  _highlightColorInGrid(targetKey) {
+    if (!this._mappedData) return;
+    if (this._highlightTimer) {
+      clearTimeout(this._highlightTimer);
+      this._highlightTimer = null;
+      // 立刻清掉上次的高亮
+      this._clearHighlightForKey(this._highlightKey);
+    }
+    const N = this._currentN, M = this._currentM;
+    let count = 0;
+    for (let j = 0; j < M; j++) {
+      const row = this._mappedData[j];
+      if (!row) continue;
+      for (let i = 0; i < N; i++) {
+        const c = row[i];
+        if (c && !c.isExternal && c.key === targetKey) {
+          this._drawCell(i, j, c, true);
+          count++;
+        }
+      }
+    }
+    if (count === 0) {
+      wx.showToast({ title: '未找到 ' + targetKey, icon: 'none' });
+      return;
+    }
+    this._highlightKey = targetKey;
+    this._highlightTimer = setTimeout(() => {
+      this._clearHighlightForKey(targetKey);
+      this._highlightTimer = null;
+      this._highlightKey = null;
+    }, 1500);
+  },
+
+  _clearHighlightForKey(key) {
+    if (!key || !this._mappedData) return;
+    const N = this._currentN, M = this._currentM;
+    for (let j = 0; j < M; j++) {
+      const row = this._mappedData[j];
+      if (!row) continue;
+      for (let i = 0; i < N; i++) {
+        const c = row[i];
+        if (c && !c.isExternal && c.key === key) {
+          this._drawCell(i, j, c, false);
+        }
+      }
+    }
   },
 
   async _excludeColor(hexUpper) {
@@ -602,6 +742,7 @@ Page({
       this._currentPalette = filtered;
       this._currentFallback = fallback;
       await this._applyMappedData(mapped);
+      this._refreshExcludedList();
       wx.showToast({ title: '已排除 ' + hexUpper, icon: 'success' });
     } catch (err) {
       console.error('[Exclude] error', err);
@@ -613,12 +754,96 @@ Page({
     }
   },
 
+  /**
+   * 单色恢复（B2.3）：从 _excludedHex 删除一个色，重跑 generate
+   */
+  async onTapExcludedChip(e) {
+    if (this.data.processing) return;
+    const hex = e.currentTarget.dataset.hex;
+    if (!hex || !this._excludedHex) return;
+    const hexUpper = hex.toUpperCase();
+    if (!this._excludedHex.has(hexUpper)) return;
+    this._excludedHex.delete(hexUpper);
+    this._refreshExcludedList();
+    wx.showToast({ title: '已恢复 ' + hexUpper, icon: 'none' });
+    await this._reapplyAfterExcludeChange();
+  },
+
+  async _reapplyAfterExcludeChange() {
+    if (!this._cachedImageData || !this._currentBrand) {
+      this.onGenerate();
+      return;
+    }
+    this.setData({ processing: true });
+    wx.showLoading({ title: '重映射…', mask: true });
+    try {
+      const fullPalette = buildPalette(this._currentBrand);
+      const filtered = fullPalette.filter(p => !this._excludedHex.has(p.hex.toUpperCase()));
+      if (filtered.length === 0) throw new Error('剩余色板为空');
+      const fallback = getFallbackColor(filtered);
+
+      await this._nextFrame();
+      let mapped = calculatePixelGrid(
+        this._cachedImageData,
+        this._currentN,
+        this._currentM,
+        filtered,
+        this._currentMode,
+        fallback
+      );
+      const threshold = this.data.mergeThreshold;
+      if (threshold > 0) {
+        const merged = mergeSimilarColors(mapped, filtered, threshold);
+        mapped = merged.data;
+      }
+      if (this.data.bgRemoved) {
+        this._bgSnapshot = mapped.map(row => row.map(c => Object.assign({}, c)));
+        const r = removeBoundaryBackground(mapped);
+        if (r.removedCount > 0) {
+          mapped = r.data;
+        } else {
+          this._bgSnapshot = null;
+          this.setData({ bgRemoved: false });
+        }
+      }
+      this._currentPalette = filtered;
+      this._currentFallback = fallback;
+      await this._applyMappedData(mapped);
+      this._refreshExcludedList();
+    } catch (err) {
+      console.error('[ReapplyExclude] error', err);
+      wx.showToast({ title: (err && err.message) || '重映射失败', icon: 'none' });
+    } finally {
+      wx.hideLoading();
+      this.setData({ processing: false });
+    }
+  },
+
+  _refreshExcludedList() {
+    const set = this._excludedHex || new Set();
+    const fullPalette = this._currentBrand ? buildPalette(this._currentBrand) : [];
+    const keyByHex = {};
+    fullPalette.forEach(p => { keyByHex[p.hex.toUpperCase()] = p.key; });
+    const list = [];
+    set.forEach(hexUpper => {
+      list.push({
+        hex: hexUpper,
+        key: keyByHex[hexUpper] || hexUpper
+      });
+    });
+    list.sort((a, b) => a.key.localeCompare(b.key));
+    this.setData({ excludedList: list });
+  },
+
   onResetExclude() {
-    if (!this._excludedHex || this._excludedHex.size === 0) return;
+    if (!this._excludedHex || this._excludedHex.size === 0) {
+      wx.showToast({ title: '无已排除色号', icon: 'none' });
+      return;
+    }
     if (this.data.processing) return;
     this._excludedHex.clear();
+    this.setData({ excludedList: [] });
     wx.showToast({ title: '已恢复全部色号', icon: 'none' });
-    // 触发一次完整重新生成
     this.onGenerate();
   },
 

@@ -180,6 +180,10 @@ page {
   font-size: 22rpx;
   margin-top: 8rpx;
 }
+.form-hint-warn {
+  color: #ff9333;
+  font-weight: 500;
+}
 
 /* -------- 主按钮 -------- */
 .btn-primary {
@@ -484,6 +488,30 @@ page {
   color: #8a8a99;
   margin-left: 8rpx;
   font-variant-numeric: tabular-nums;
+}
+.excluded-chip {
+  background: #fff5f0;
+  border: 1rpx dashed #ffb38a;
+}
+.excluded-chip:active {
+  background: #ffe8d8;
+}
+.excluded-swatch {
+  position: relative;
+  opacity: 0.55;
+}
+.excluded-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 45%, #ff6b3d 45%, #ff6b3d 55%, transparent 55%);
+  border-radius: 50%;
+}
+.usage-restore {
+  margin-left: 8rpx;
+  color: #ff6b3d;
+  font-size: 24rpx;
+  font-weight: 600;
 }
 
 .export-row {
