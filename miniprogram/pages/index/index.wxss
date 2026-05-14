@@ -223,6 +223,96 @@
   background: #f0eeff;
   color: #5b3cd6;
 }
+.btn-tool-disabled {
+  color: #c0c0cc;
+  border-color: #ececf2;
+}
+.edit-hint {
+  text-align: center;
+  color: #a0a0b0;
+  font-size: 22rpx;
+  margin-top: 8rpx;
+}
+
+/* 选色面板 */
+.picker-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 100;
+}
+.picker-mask-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.picker-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 28rpx 24rpx 32rpx;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+  z-index: 101;
+  max-height: 70vh;
+}
+.picker-sheet-on {
+  transform: translateY(0);
+}
+.picker-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.picker-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f1f23;
+}
+.picker-meta {
+  font-size: 22rpx;
+  color: #a0a0b0;
+  margin-left: 12rpx;
+  flex: 1;
+}
+.picker-close {
+  font-size: 26rpx;
+  color: #5b3cd6;
+  padding: 4rpx 12rpx;
+}
+.picker-grid {
+  max-height: 60vh;
+}
+.picker-grid-inner {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 8rpx 0;
+}
+.picker-color {
+  width: 14.28%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx 4rpx;
+}
+.picker-swatch {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(0,0,0,0.1);
+  margin-bottom: 6rpx;
+}
+.picker-key {
+  font-size: 18rpx;
+  color: #5a5a6e;
+  text-align: center;
+}
 
 /* 色板用量条 */
 .usage-section {

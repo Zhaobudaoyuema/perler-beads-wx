@@ -33,6 +33,11 @@ Page({
     stale: false,
     usageList: [],
     previewScale: '1.0',
+    eraseMode: false,
+    canUndo: false,
+    pickerVisible: false,
+    pickerList: [],
+    pickerCellInfo: '',
 
     // 状态
     processing: false,
@@ -107,6 +112,8 @@ Page({
         that._cachedImageDataPath = null;
         that._excludedHex = new Set();
         that._bgSnapshot = null;
+        that._editHistory = [];
+        that._selectedCell = null;
         that.setData({
           tempFilePath: file.tempFilePath,
           hasResult: false,
@@ -143,9 +150,12 @@ Page({
     wx.showLoading({ title: '生成中…', mask: true });
 
     try {
-      // 重新生成 → 清空排除集与去背景快照
+      // 重新生成 → 清空排除集 / 去背景快照 / 编辑历史
       this._excludedHex = new Set();
       this._bgSnapshot = null;
+      this._editHistory = [];
+      this._selectedCell = null;
+      this.setData({ canUndo: false, eraseMode: false, pickerVisible: false });
 
       // 1. 拿原图 ImageData（带缓存：同一张图复用）
       const imageData = await this._ensureImageData();
@@ -259,6 +269,179 @@ Page({
       usageList,
       hasResult: true,
       stale: false
+    });
+  },
+
+  // ==================== 手动逐格编辑 ====================
+
+  onToggleEraseMode() {
+    if (!this.data.hasResult) return;
+    this.setData({ eraseMode: !this.data.eraseMode });
+    if (this.data.eraseMode) {
+      wx.showToast({ title: '擦除模式：点击格子置为透明', icon: 'none' });
+    }
+  },
+
+  onUndo() {
+    if (!this._editHistory || this._editHistory.length === 0) {
+      wx.showToast({ title: '无可撤销', icon: 'none' });
+      return;
+    }
+    const last = this._editHistory.pop();
+    if (!last || !this._mappedData) return;
+    const { i, j, prev } = last;
+    if (!this._mappedData[j] || !this._mappedData[j][i]) return;
+    this._mappedData[j][i] = prev;
+    this._drawCell(i, j, prev, false);
+    this._recomputeUsageAndCount();
+    this.setData({ canUndo: this._editHistory.length > 0 });
+  },
+
+  /**
+   * 触摸 previewCanvas → 换算到 (i, j) → 弹选色 / 擦除
+   */
+  async onPreviewTouch(e) {
+    if (!this.data.hasResult || !this._mappedData) return;
+    if (this.data.processing) return;
+    if (this.data.pickerVisible) return;
+    // 双指/多指手势是缩放，忽略
+    if (e.touches && e.touches.length > 1) return;
+    const touch = e.touches && e.touches[0];
+    if (!touch) return;
+
+    try {
+      const rect = await this._getCanvasBoundingRect('previewCanvas');
+      if (!rect || !rect.width) return;
+
+      const { startX, startY, cell, cssW, cssH, N, M } = this._previewDraw || {};
+      if (!cell) return;
+
+      // 屏幕坐标 → canvas CSS 坐标（rect 已包含 movable-view scale）
+      const localX = (touch.clientX - rect.left) * cssW / rect.width;
+      const localY = (touch.clientY - rect.top) * cssH / rect.height;
+
+      const i = Math.floor((localX - startX) / cell);
+      const j = Math.floor((localY - startY) / cell);
+      if (i < 0 || i >= N || j < 0 || j >= M) return;
+
+      // 清掉旧选中格的高亮
+      const sel = this._selectedCell;
+      if (sel && (sel.i !== i || sel.j !== j)) {
+        this._drawCell(sel.i, sel.j, this._mappedData[sel.j][sel.i], false);
+      }
+      this._selectedCell = { i, j };
+      this._drawCell(i, j, this._mappedData[j][i], true);
+
+      if (this.data.eraseMode) {
+        this._applyEdit(i, j, { key: 'ERASE', color: '#FFFFFF', isExternal: true });
+      } else {
+        this._showPickerForCell(i, j);
+      }
+    } catch (err) {
+      console.error('[Touch] error', err);
+    }
+  },
+
+  _getCanvasBoundingRect(id) {
+    return new Promise((resolve, reject) => {
+      const q = wx.createSelectorQuery().in(this);
+      q.select('#' + id).boundingClientRect();
+      q.exec(res => {
+        if (!res || !res[0]) return reject(new Error('rect not found'));
+        resolve(res[0]);
+      });
+    });
+  },
+
+  _showPickerForCell(i, j) {
+    const palette = this._currentPalette || [];
+    if (palette.length === 0) return;
+    this._pickerCell = { i, j };
+    this.setData({
+      pickerVisible: true,
+      pickerList: palette,
+      pickerCellInfo: 'i=' + i + ', j=' + j
+    });
+  },
+
+  onClosePicker() {
+    // 关闭选色面板，并清掉高亮
+    const sel = this._selectedCell;
+    if (sel && this._mappedData) {
+      this._drawCell(sel.i, sel.j, this._mappedData[sel.j][sel.i], false);
+    }
+    this._selectedCell = null;
+    this._pickerCell = null;
+    this.setData({ pickerVisible: false });
+  },
+
+  onTapPickerColor(e) {
+    if (!this._pickerCell) return;
+    const idx = Number(e.currentTarget.dataset.idx);
+    const palette = this._currentPalette || [];
+    const picked = palette[idx];
+    if (!picked) return;
+    const { i, j } = this._pickerCell;
+    this._applyEdit(i, j, {
+      key: picked.key,
+      color: picked.hex,
+      isExternal: false
+    });
+    this.setData({ pickerVisible: false });
+    this._pickerCell = null;
+  },
+
+  /**
+   * 应用编辑：写入 mappedData，push history，单格重绘，更新统计
+   */
+  _applyEdit(i, j, newCell) {
+    if (!this._mappedData || !this._mappedData[j] || !this._mappedData[j][i]) return;
+    const prev = Object.assign({}, this._mappedData[j][i]);
+    if (prev.key === newCell.key && !!prev.isExternal === !!newCell.isExternal) {
+      return;
+    }
+    this._mappedData[j][i] = Object.assign({ isExternal: false }, newCell);
+    this._editHistory = this._editHistory || [];
+    this._editHistory.push({ i, j, prev });
+
+    this._drawCell(i, j, this._mappedData[j][i], false);
+    this._selectedCell = null;
+    this._recomputeUsageAndCount();
+    this.setData({ canUndo: this._editHistory.length > 0 });
+  },
+
+  /**
+   * 编辑后增量更新 usageList / totalBeads / usedColorCount
+   */
+  _recomputeUsageAndCount() {
+    if (!this._mappedData) return;
+    const N = this._currentN;
+    const M = this._currentM;
+    const palette = this._currentPalette || [];
+    const colorMap = {};
+    let total = 0;
+    for (let j = 0; j < M; j++) {
+      for (let i = 0; i < N; i++) {
+        const c = this._mappedData[j][i];
+        if (!c || c.isExternal || !c.key) continue;
+        colorMap[c.key] = (colorMap[c.key] || 0) + 1;
+        total++;
+      }
+    }
+    this._colorCountMap = colorMap;
+
+    const hexByKey = {};
+    palette.forEach(p => { hexByKey[p.key] = p.hex; });
+    const usageList = Object.keys(colorMap).map(key => ({
+      key,
+      count: colorMap[key],
+      color: hexByKey[key] || '#cccccc'
+    })).sort((a, b) => b.count - a.count);
+
+    this.setData({
+      totalBeads: total,
+      usedColorCount: Object.keys(colorMap).length,
+      usageList
     });
   },
 
@@ -472,6 +655,7 @@ Page({
 
   /**
    * 把 mappedData 画到 previewCanvas（带网格 + 色号 + 标题）
+   * 同时把 ctx 与绘图常量挂到实例，供 _drawCell 增量重绘复用
    */
   async _renderPreview(mappedData, N, M, brand) {
     const dpr = (app.globalData && app.globalData.pixelRatio) || 2;
@@ -505,52 +689,79 @@ Page({
     ctx.textAlign = 'left';
     ctx.fillText(brand + ' 色号 · ' + N + ' × ' + M, pad, headerH / 2);
 
-    // 网格
     const startX = pad;
     const startY = headerH + pad;
-
-    // 字号根据 cell 自适应
     const fontSize = Math.max(8, Math.floor(cell * 0.36));
-    ctx.font = '500 ' + fontSize + 'px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+
+    // 缓存绘图上下文，供 _drawCell 增量重绘
+    this._previewDraw = {
+      canvas,
+      ctx,
+      cell,
+      pad,
+      headerH,
+      startX,
+      startY,
+      fontSize,
+      cssW,
+      cssH,
+      N,
+      M
+    };
 
     for (let j = 0; j < M; j++) {
       for (let i = 0; i < N; i++) {
-        const c = mappedData[j][i];
-        const x = startX + i * cell;
-        const y = startY + j * cell;
-
-        if (c && c.isExternal) {
-          // 透明背景（白底 + 浅灰斜线）表示已去除
-          ctx.fillStyle = '#fafafa';
-          ctx.fillRect(x, y, cell, cell);
-          ctx.strokeStyle = '#dcdce4';
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          ctx.moveTo(x, y + cell);
-          ctx.lineTo(x + cell, y);
-          ctx.stroke();
-          // 边框
-          ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-          ctx.lineWidth = 0.6;
-          ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
-          continue;
-        }
-
-        ctx.fillStyle = c.color;
-        ctx.fillRect(x, y, cell, cell);
-
-        // 描边
-        ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-        ctx.lineWidth = 0.6;
-        ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
-
-        // 色号文字（根据底色明暗自动选黑/白）
-        const textColor = this._pickTextColor(c.color);
-        ctx.fillStyle = textColor;
-        ctx.fillText(c.key, x + cell / 2, y + cell / 2);
+        this._drawCell(i, j, mappedData[j][i], false);
       }
+    }
+  },
+
+  /**
+   * 在已渲染的 previewCanvas 上单格重绘
+   * @param {number} i 列
+   * @param {number} j 行
+   * @param {object} cellData 当前格数据（为 null/undefined 时尝试从 _mappedData 读）
+   * @param {boolean} highlighted 是否高亮（用于选中态）
+   */
+  _drawCell(i, j, cellData, highlighted) {
+    const ctx = this._previewDraw && this._previewDraw.ctx;
+    if (!ctx) return;
+    const { cell, startX, startY, fontSize } = this._previewDraw;
+    const c = cellData || (this._mappedData && this._mappedData[j] && this._mappedData[j][i]);
+    if (!c) return;
+    const x = startX + i * cell;
+    const y = startY + j * cell;
+
+    if (c.isExternal) {
+      ctx.fillStyle = '#fafafa';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = '#dcdce4';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y + cell);
+      ctx.lineTo(x + cell, y);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
+    } else {
+      ctx.fillStyle = c.color;
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 0.6;
+      ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
+
+      ctx.font = '500 ' + fontSize + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = this._pickTextColor(c.color);
+      ctx.fillText(c.key, x + cell / 2, y + cell / 2);
+    }
+
+    if (highlighted) {
+      ctx.strokeStyle = '#ff3b30';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
     }
   },
 

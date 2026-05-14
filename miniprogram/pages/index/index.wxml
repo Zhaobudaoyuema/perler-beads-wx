@@ -123,6 +123,7 @@
           id="previewCanvas"
           class="preview-canvas"
           style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
+          bindtouchstart="onPreviewTouch"
         ></canvas>
       </movable-view>
     </movable-area>
@@ -132,6 +133,17 @@
         {{bgRemoved ? '撤回去背景' : '一键去背景'}}
       </button>
       <button class="btn-tool" bindtap="onResetExclude">恢复已排除</button>
+    </view>
+
+    <!-- 编辑工具栏 -->
+    <view class="action-row" wx:if="{{hasResult}}">
+      <button class="btn-tool {{eraseMode ? 'btn-tool-active' : ''}}" bindtap="onToggleEraseMode">
+        {{eraseMode ? '退出擦除' : '擦除模式'}}
+      </button>
+      <button class="btn-tool {{canUndo ? '' : 'btn-tool-disabled'}}" bindtap="onUndo">撤销编辑</button>
+    </view>
+    <view wx:if="{{hasResult}}" class="edit-hint">
+      点击格子可{{eraseMode ? '擦除' : '更改色号'}}；缩放图纸时无效
     </view>
 
     <!-- 色板用量条：可点击排除 -->
@@ -171,4 +183,29 @@
   </view>
 
   <view class="footer">基于 Zippland/perler-beads 移植 · MIT 内核 / AGPL 项目</view>
+
+  <!-- 选色面板（编辑单格用） -->
+  <view class="picker-mask {{pickerVisible ? 'picker-mask-on' : ''}}" catchtap="onClosePicker"></view>
+  <view class="picker-sheet {{pickerVisible ? 'picker-sheet-on' : ''}}">
+    <view class="picker-header">
+      <text class="picker-title">选择色号</text>
+      <text class="picker-meta">{{pickerCellInfo}}</text>
+      <text class="picker-close" bindtap="onClosePicker">取消</text>
+    </view>
+    <scroll-view class="picker-grid" scroll-y>
+      <view class="picker-grid-inner">
+        <view
+          class="picker-color"
+          wx:for="{{pickerList}}"
+          wx:key="key"
+          wx:for-index="idx"
+          data-idx="{{idx}}"
+          bindtap="onTapPickerColor"
+        >
+          <view class="picker-swatch" style="background:{{item.hex}}"></view>
+          <text class="picker-key">{{item.key}}</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
 </view>
