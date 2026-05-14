@@ -2,13 +2,23 @@ const { calculatePixelGrid, PixelationMode } = require('../../utils/pixelation.j
 const { brandOptions, modeOptions, buildPalette, getFallbackColor } = require('../../utils/colorSystem.js');
 const { mergeSimilarColors } = require('../../utils/colorMerge.js');
 const { removeBoundaryBackground } = require('../../utils/backgroundRemove.js');
+const previewRender = require('../../utils/previewRender.js');
+const exportRender = require('../../utils/exportRender.js');
 
 const app = getApp();
 
 const MAX_SRC_PIXELS = 1200; // 原图最长边缩放上限，控制 getImageData 性能与内存
-const PREVIEW_CELL_PX = 28;  // 预览/导出每格像素（CSS 等价 px，绘制时再乘 dpr）
-const PREVIEW_HEADER_PX = 56; // 预览顶部留白（写元信息）
-const PREVIEW_PADDING = 8;
+
+// 预览/导出常量从 previewRender 抽出，本文件仅用于计算
+const PREVIEW_PADDING = previewRender.PREVIEW_PADDING;
+const PREVIEW_LABEL_MIN_CELL = previewRender.PREVIEW_LABEL_MIN_CELL;
+const EXPORT_CELL_PX = previewRender.EXPORT_CELL_PX;
+const EXPORT_HEADER_PX = previewRender.EXPORT_HEADER_PX;
+const EXPORT_PADDING = previewRender.EXPORT_PADDING;
+
+// tap 判定阈值
+const TAP_MAX_MOVE_PX = 8;
+const TAP_MAX_DURATION_MS = 500;
 
 Page({
   data: {
@@ -42,15 +52,53 @@ Page({
     // 状态
     processing: false,
 
-    // 预览 canvas 尺寸（CSS px）
+    // 预览 canvas 尺寸（CSS px）—— canvas 自然尺寸
     previewCssW: 100,
     previewCssH: 100,
+    // 预览 movable-area（屏幕上的可视框）—— 一般与 canvas 一致，超出屏宽时小于 canvas
+    previewAreaW: 100,
+    previewAreaH: 100,
+    // 预览副标题（从 canvas 里移出来的 brand · N×M）
+    previewSubtitle: '',
 
     // 离屏 canvas 尺寸（CSS px）—— 给一个最小可见尺寸，type=2d 不能 hidden
     srcCssW: 1,
     srcCssH: 1,
     listCssW: 1,
-    listCssH: 1
+    listCssH: 1,
+    posterCssW: 1,
+    posterCssH: 1,
+    exportCssW: 1,
+    exportCssH: 1,
+
+    // 导出选项
+    exportSheetVisible: false,
+    exportOpts: {
+      showGrid: true,
+      showCoordinates: true,
+      showCellNumbers: true,
+      includeStats: true
+    },
+    gridIntervalOptions: [5, 10, 20],
+    gridIntervalIndex: 1, // 默认 10
+    gridColorOptions: [
+      { label: '黑色', value: '#000000' },
+      { label: '深灰', value: '#5b5b6e' },
+      { label: '白色', value: '#ffffff' }
+    ],
+    gridColorLabels: ['黑色', '深灰', '白色'],
+    gridColorIndex: 0,
+
+    // 安全区（页面 padding 用，rpx 比较麻烦，直接用 px 注入）
+    safeBottom: 0,
+    headerNavH: 0
+  },
+
+  onLoad() {
+    const g = (app && app.globalData) || {};
+    this.setData({
+      safeBottom: g.safeBottom || 0
+    });
   },
 
   onReady() {
@@ -58,6 +106,7 @@ Page({
     this._getCanvasNode('previewCanvas').catch(() => {});
     this._getCanvasNode('srcCanvas').catch(() => {});
     this._getCanvasNode('listCanvas').catch(() => {});
+    this._getCanvasNode('posterCanvas').catch(() => {});
   },
 
   // ==================== 配置项变更 ====================
@@ -298,33 +347,66 @@ Page({
   },
 
   /**
-   * 触摸 previewCanvas → 换算到 (i, j) → 弹选色 / 擦除
+   * 预览 canvas 触摸 —— 三段式手势识别，避免与 movable-view pinch 冲突
+   *   touchstart: 记录起点
+   *   touchmove:  位移超阈值 / 双指落下 → 取消 tap（让位 pinch / pan）
+   *   touchend:   仅当一指 / 短时 / 无位移 → 视为 tap，触发选色或擦除
    */
-  async onPreviewTouch(e) {
+  onPreviewTouchStart(e) {
     if (!this.data.hasResult || !this._mappedData) return;
     if (this.data.processing) return;
     if (this.data.pickerVisible) return;
-    // 双指/多指手势是缩放，忽略
-    if (e.touches && e.touches.length > 1) return;
+    if (e.touches && e.touches.length > 1) {
+      // 一开始就是双指，绝不是 tap
+      this._previewTap = null;
+      return;
+    }
     const touch = e.touches && e.touches[0];
     if (!touch) return;
+    this._previewTap = {
+      x: touch.clientX,
+      y: touch.clientY,
+      t: Date.now(),
+      cancelled: false
+    };
+  },
+
+  onPreviewTouchMove(e) {
+    const tap = this._previewTap;
+    if (!tap) return;
+    if (e.touches && e.touches.length > 1) {
+      tap.cancelled = true;
+      return;
+    }
+    const touch = e.touches && e.touches[0];
+    if (!touch) return;
+    const dx = touch.clientX - tap.x;
+    const dy = touch.clientY - tap.y;
+    if (dx * dx + dy * dy > TAP_MAX_MOVE_PX * TAP_MAX_MOVE_PX) {
+      tap.cancelled = true;
+    }
+  },
+
+  async onPreviewTouchEnd(e) {
+    const tap = this._previewTap;
+    this._previewTap = null;
+    if (!tap || tap.cancelled) return;
+    if (Date.now() - tap.t > TAP_MAX_DURATION_MS) return;
+    if (this.data.pickerVisible) return;
+    if (!this.data.hasResult || !this._mappedData) return;
 
     try {
       const rect = await this._getCanvasBoundingRect('previewCanvas');
       if (!rect || !rect.width) return;
-
       const { startX, startY, cell, cssW, cssH, N, M } = this._previewDraw || {};
       if (!cell) return;
-
       // 屏幕坐标 → canvas CSS 坐标（rect 已包含 movable-view scale）
-      const localX = (touch.clientX - rect.left) * cssW / rect.width;
-      const localY = (touch.clientY - rect.top) * cssH / rect.height;
-
+      const localX = (tap.x - rect.left) * cssW / rect.width;
+      const localY = (tap.y - rect.top) * cssH / rect.height;
       const i = Math.floor((localX - startX) / cell);
       const j = Math.floor((localY - startY) / cell);
       if (i < 0 || i >= N || j < 0 || j >= M) return;
 
-      // 清掉旧选中格的高亮
       const sel = this._selectedCell;
       if (sel && (sel.i !== i || sel.j !== j)) {
         this._drawCell(sel.i, sel.j, this._mappedData[sel.j][sel.i], false);
@@ -338,8 +420,12 @@ Page({
         this._showPickerForCell(i, j);
       }
     } catch (err) {
-      console.error('[Touch] error', err);
+      console.error('[Tap] error', err);
     }
+  },
+
+  onPreviewTouchCancel() {
+    this._previewTap = null;
   },
 
   _getCanvasBoundingRect(id) {
@@ -654,19 +740,33 @@ Page({
   },
 
   /**
-   * 把 mappedData 画到 previewCanvas（带网格 + 色号 + 标题）
-   * 同时把 ctx 与绘图常量挂到实例，供 _drawCell 增量重绘复用
+   * 计算预览 canvas 与 movable-area 的尺寸（委托给 previewRender.computePreviewLayout）
+   */
+  _computePreviewLayout(N, M) {
+    const g = (app && app.globalData) || {};
+    return previewRender.computePreviewLayout(N, M, {
+      winW: g.windowWidth || 375,
+      winH: g.windowHeight || 667
+    });
+  },
+
+  /**
+   * 把 mappedData 画到 previewCanvas（纯色块网格，无标题）
+   * 标题信息以 wxml 文本形式显示在 canvas 上方
    */
   async _renderPreview(mappedData, N, M, brand) {
     const dpr = (app.globalData && app.globalData.pixelRatio) || 2;
-    const cell = PREVIEW_CELL_PX;
+    const { cell, cssW, cssH, areaW, areaH } = this._computePreviewLayout(N, M);
     const pad = PREVIEW_PADDING;
-    const headerH = PREVIEW_HEADER_PX;
-    const cssW = N * cell + pad * 2;
-    const cssH = M * cell + pad * 2 + headerH;
 
     await new Promise(resolve => {
-      this.setData({ previewCssW: cssW, previewCssH: cssH }, () => resolve());
+      this.setData({
+        previewCssW: cssW,
+        previewCssH: cssH,
+        previewAreaW: areaW,
+        previewAreaH: areaH,
+        previewSubtitle: brand + ' · ' + N + ' × ' + M
+      }, () => resolve());
     });
 
     delete (this._canvasCache || {}).previewCanvas;
@@ -678,35 +778,21 @@ Page({
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    // 背景
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, cssW, cssH);
 
-    // 顶部标题
-    ctx.fillStyle = '#1f1f23';
-    ctx.font = '600 18px sans-serif';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    ctx.fillText(brand + ' 色号 · ' + N + ' × ' + M, pad, headerH / 2);
-
     const startX = pad;
-    const startY = headerH + pad;
-    const fontSize = Math.max(8, Math.floor(cell * 0.36));
+    const startY = pad;
+    const fontSize = Math.max(8, Math.floor(cell * 0.42));
+    const drawLabel = cell >= PREVIEW_LABEL_MIN_CELL;
 
-    // 缓存绘图上下文，供 _drawCell 增量重绘
     this._previewDraw = {
-      canvas,
-      ctx,
-      cell,
-      pad,
-      headerH,
-      startX,
-      startY,
-      fontSize,
-      cssW,
-      cssH,
-      N,
-      M
+      canvas, ctx,
+      cell, pad,
+      startX, startY,
+      fontSize, drawLabel,
+      cssW, cssH,
+      N, M
     };
 
     for (let j = 0; j < M; j++) {
@@ -717,76 +803,178 @@ Page({
   },
 
   /**
-   * 在已渲染的 previewCanvas 上单格重绘
-   * @param {number} i 列
-   * @param {number} j 行
-   * @param {object} cellData 当前格数据（为 null/undefined 时尝试从 _mappedData 读）
-   * @param {boolean} highlighted 是否高亮（用于选中态）
+   * 在已渲染的 previewCanvas 上单格重绘（委托给 previewRender.drawCellOnContext）
    */
   _drawCell(i, j, cellData, highlighted) {
     const ctx = this._previewDraw && this._previewDraw.ctx;
     if (!ctx) return;
-    const { cell, startX, startY, fontSize } = this._previewDraw;
+    const { cell, startX, startY, drawLabel } = this._previewDraw;
     const c = cellData || (this._mappedData && this._mappedData[j] && this._mappedData[j][i]);
     if (!c) return;
-    const x = startX + i * cell;
-    const y = startY + j * cell;
+    previewRender.drawCellOnContext(
+      ctx, c,
+      startX + i * cell,
+      startY + j * cell,
+      cell,
+      { drawLabel, highlighted: !!highlighted }
+    );
+  },
 
-    if (c.isExternal) {
-      ctx.fillStyle = '#fafafa';
-      ctx.fillRect(x, y, cell, cell);
-      ctx.strokeStyle = '#dcdce4';
-      ctx.lineWidth = 0.5;
-      ctx.beginPath();
-      ctx.moveTo(x, y + cell);
-      ctx.lineTo(x + cell, y);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-      ctx.lineWidth = 0.6;
-      ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
-    } else {
-      ctx.fillStyle = c.color;
-      ctx.fillRect(x, y, cell, cell);
-      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-      ctx.lineWidth = 0.6;
-      ctx.strokeRect(x + 0.3, y + 0.3, cell - 0.6, cell - 0.6);
+  /**
+   * 渲染高清导出图，按 options 决定是否带坐标/网格/统计
+   *
+   * @param mappedData
+   * @param N
+   * @param M
+   * @param brand
+   * @param options { showGrid, gridInterval, showCoordinates, showCellNumbers, gridLineColor, includeStats }
+   */
+  async _renderExportPoster(mappedData, N, M, brand, options) {
+    const dpr = (app.globalData && app.globalData.pixelRatio) || 2;
+    const opts = options || {};
 
-      ctx.font = '500 ' + fontSize + 'px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = this._pickTextColor(c.color);
-      ctx.fillText(c.key, x + cell / 2, y + cell / 2);
+    // 1. 计算布局（统计区按 items 数量预估）
+    const palette = this._currentPalette || [];
+    const statsItems = opts.includeStats
+      ? exportRender.buildStatsItems(this._colorCountMap || {}, palette)
+      : [];
+
+    const layout = exportRender.computeExportLayout(N, M, {
+      showCoordinates: opts.showCoordinates,
+      includeStats: opts.includeStats,
+      statsItemsCount: statsItems.length
+    });
+
+    const { cssW, cssH } = layout;
+
+    // 2. 同步 css 尺寸到 wxml（type=2d 必须）
+    await new Promise(resolve => {
+      this.setData({ exportCssW: cssW, exportCssH: cssH }, () => resolve());
+    });
+
+    delete (this._canvasCache || {}).exportCanvas;
+    const res = await this._getCanvasNode('exportCanvas');
+    const canvas = res.node;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    if ('imageSmoothingEnabled' in ctx) ctx.imageSmoothingEnabled = false;
+
+    // 3. 调用纯函数渲染
+    exportRender.renderExportToContext(
+      ctx, mappedData, N, M, layout, opts,
+      { brand: brand || '', statsItems }
+    );
+
+    return canvas;
+  },
+
+  /**
+   * 留作兼容：之前的 posterCanvas 简版渲染（28px/cell 只画色块和文字）
+   * 当前未使用，但保留方法以便回退
+   */
+  // eslint-disable-next-line no-unused-vars
+  async _renderSimplePoster(mappedData, N, M, brand) {
+    const dpr = (app.globalData && app.globalData.pixelRatio) || 2;
+    const cell = EXPORT_CELL_PX;
+    const pad = EXPORT_PADDING;
+    const headerH = EXPORT_HEADER_PX;
+    const cssW = N * cell + pad * 2;
+    const cssH = M * cell + pad * 2 + headerH;
+
+    await new Promise(resolve => {
+      this.setData({ posterCssW: cssW, posterCssH: cssH }, () => resolve());
+    });
+
+    delete (this._canvasCache || {}).posterCanvas;
+    const res = await this._getCanvasNode('posterCanvas');
+    const canvas = res.node;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    ctx.fillStyle = '#1f1f23';
+    ctx.font = '600 20px sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(brand + ' 色号 · ' + N + ' × ' + M, pad, headerH / 2);
+
+    const startX = pad;
+    const startY = headerH + pad;
+
+    for (let j = 0; j < M; j++) {
+      for (let i = 0; i < N; i++) {
+        const c = mappedData[j] && mappedData[j][i];
+        if (!c) continue;
+        previewRender.drawCellOnContext(
+          ctx, c, startX + i * cell, startY + j * cell, cell,
+          { drawLabel: true }
+        );
+      }
     }
-
-    if (highlighted) {
-      ctx.strokeStyle = '#ff3b30';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, y + 1, cell - 2, cell - 2);
-    }
+    return canvas;
   },
 
   _pickTextColor(hex) {
-    const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-    if (!m) return '#000000';
-    const v = parseInt(m[1], 16);
-    const r = (v >> 16) & 0xff;
-    const g = (v >> 8) & 0xff;
-    const b = v & 0xff;
-    // 亮度公式（Rec.601）
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 150 ? '#1f1f23' : '#ffffff';
+    return previewRender.pickTextColor(hex);
   },
 
   // ==================== 导出图纸 ====================
 
-  async onSavePoster() {
+  onOpenExportSheet() {
+    if (!this.data.hasResult) {
+      wx.showToast({ title: '请先生成图纸', icon: 'none' });
+      return;
+    }
+    this.setData({ exportSheetVisible: true });
+  },
+
+  onCloseExportSheet() {
+    this.setData({ exportSheetVisible: false });
+  },
+
+  onExportOptToggle(e) {
+    const key = e.currentTarget.dataset.key;
+    const value = e.detail.value;
+    if (!key) return;
+    this.setData({ ['exportOpts.' + key]: value });
+  },
+
+  onGridIntervalChange(e) {
+    this.setData({ gridIntervalIndex: Number(e.detail.value) });
+  },
+
+  onGridColorChange(e) {
+    this.setData({ gridColorIndex: Number(e.detail.value) });
+  },
+
+  async onConfirmExport() {
     if (!this.data.hasResult) return;
+    if (!this._mappedData) return;
+
+    const opts = this.data.exportOpts;
+    const gridInterval = this.data.gridIntervalOptions[this.data.gridIntervalIndex];
+    const gridLineColor = this.data.gridColorOptions[this.data.gridColorIndex].value;
+
+    this.setData({ exportSheetVisible: false });
     wx.showLoading({ title: '保存中…', mask: true });
     try {
-      const res = await this._getCanvasNode('previewCanvas');
+      const canvas = await this._renderExportPoster(
+        this._mappedData,
+        this._currentN,
+        this._currentM,
+        this._currentBrand || '',
+        Object.assign({}, opts, { gridInterval, gridLineColor })
+      );
       const tempPath = await new Promise((resolve, reject) => {
         wx.canvasToTempFilePath({
-          canvas: res.node,
+          canvas,
           fileType: 'png',
           success: r => resolve(r.tempFilePath),
           fail: reject
@@ -799,6 +987,13 @@ Page({
       wx.hideLoading();
       this._handleSaveError(err);
     }
+  },
+
+  /**
+   * 兼容老入口（如分享、其他地方调用）：直接走默认选项
+   */
+  async onSavePoster() {
+    this.onOpenExportSheet();
   },
 
   // ==================== 导出采购清单 ====================

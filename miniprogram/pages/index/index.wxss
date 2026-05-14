@@ -1,88 +1,138 @@
+/* =================================================
+   拼豆图纸生成器 · 小程序样式（已做安全区 / 响应式适配）
+   - 默认基于 750rpx 设计稿；rpx 自带等比缩放
+   - 关键尺寸用 rpx；safe-area 用 px（注入 safeBottom）
+   - 兼容小屏 iPhone SE / 大屏 Pro Max / Android 主流机型
+   ================================================= */
+
+page {
+  background: #f5f5f9;
+}
+
 .page {
   min-height: 100vh;
-  padding: 24rpx 24rpx 64rpx;
+  padding: 16rpx 24rpx 32rpx;
+  box-sizing: border-box;
 }
 
+/* -------- Hero（紧凑：导航栏已有标题，这里只放副标题） -------- */
 .hero {
-  padding: 24rpx 8rpx 32rpx;
-}
-.hero-title {
-  font-size: 44rpx;
-  font-weight: 700;
-  color: #1f1f23;
-  letter-spacing: 1rpx;
+  padding: 8rpx 8rpx 16rpx;
 }
 .hero-sub {
-  margin-top: 8rpx;
-  color: #8a8a99;
-  font-size: 26rpx;
+  color: #6f6f80;
+  font-size: 24rpx;
+  line-height: 1.4;
 }
 
+/* -------- 卡片 -------- */
 .card {
   background: #ffffff;
-  border-radius: 24rpx;
-  padding: 32rpx 28rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 4rpx 24rpx rgba(20, 20, 40, 0.04);
+  border-radius: 20rpx;
+  padding: 24rpx 24rpx 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 16rpx rgba(20, 20, 40, 0.04);
+}
+.card-generate {
+  padding: 24rpx 24rpx 24rpx;
 }
 .card-title {
-  font-size: 30rpx;
+  font-size: 28rpx;
   font-weight: 600;
   color: #1f1f23;
-  margin-bottom: 24rpx;
+}
+.card-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
 }
 
-/* 上传区 */
+/* -------- 步骤头（替代旧的纯文字 title） -------- */
+.step-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+.step-index {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c5cff, #5b8cff);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+  text-align: center;
+  line-height: 36rpx;
+  margin-right: 14rpx;
+  flex-shrink: 0;
+}
+.step-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1f1f23;
+  flex: 1;
+}
+.step-meta {
+  font-size: 22rpx;
+  color: #9a9ab0;
+}
+
+/* -------- 上传区 -------- */
 .upload-zone {
   border: 2rpx dashed #d6d6e0;
-  border-radius: 20rpx;
-  padding: 56rpx 24rpx;
+  border-radius: 18rpx;
+  padding: 44rpx 24rpx;
   text-align: center;
   background: #fafaff;
   transition: all 0.2s;
 }
+.upload-zone-filled {
+  padding: 16rpx;
+  background: #ffffff;
+  border-style: solid;
+  border-color: #ecebf3;
+}
 .upload-icon {
-  font-size: 80rpx;
+  font-size: 72rpx;
   color: #c2c2cf;
   font-weight: 200;
   line-height: 1;
 }
 .upload-text {
-  margin-top: 16rpx;
+  margin-top: 12rpx;
   color: #5a5a6e;
-  font-size: 28rpx;
+  font-size: 26rpx;
 }
 .upload-sub {
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   color: #a0a0b0;
-  font-size: 24rpx;
+  font-size: 22rpx;
 }
 .thumb {
   width: 100%;
-  height: 360rpx;
-  border-radius: 16rpx;
+  height: 320rpx;
+  border-radius: 14rpx;
+  background: #f0f0f5;
 }
 .thumb-hint {
-  margin-top: 16rpx;
+  margin-top: 12rpx;
   color: #8a8a99;
-  font-size: 24rpx;
-}
-.meta {
-  margin-top: 16rpx;
-  font-size: 24rpx;
-  color: #8a8a99;
+  font-size: 22rpx;
+  text-align: center;
 }
 
-/* 配置项 */
+/* -------- 表单 -------- */
 .form-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18rpx 0;
+  padding: 16rpx 0;
   border-top: 1rpx solid #f0f0f5;
 }
 .form-row:first-of-type {
   border-top: none;
+  padding-top: 4rpx;
 }
 .form-row-block {
   display: block;
@@ -91,30 +141,39 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 56rpx;
 }
 .form-label {
   color: #5a5a6e;
-  font-size: 28rpx;
+  font-size: 26rpx;
 }
 .form-value {
   color: #1f1f23;
   font-size: 30rpx;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .picker {
-  flex: 1;
   text-align: right;
 }
 .picker-value {
   color: #1f1f23;
-  font-size: 28rpx;
+  font-size: 26rpx;
   padding: 8rpx 16rpx;
   background: #f4f4f8;
   border-radius: 12rpx;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+}
+.picker-arrow {
+  color: #b0b0c0;
+  font-size: 28rpx;
+  line-height: 1;
+  margin-left: 4rpx;
 }
 .slider {
-  margin: 16rpx 0 0;
+  margin: 8rpx 0 0;
 }
 .form-hint {
   color: #a0a0b0;
@@ -122,70 +181,124 @@
   margin-top: 8rpx;
 }
 
-/* 主按钮 */
+/* -------- 主按钮 -------- */
 .btn-primary {
   background: linear-gradient(135deg, #7c5cff, #5b8cff);
   color: #fff;
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 600;
   height: 88rpx;
   line-height: 88rpx;
   border-radius: 16rpx;
   border: none;
+  letter-spacing: 1rpx;
+  box-shadow: 0 8rpx 24rpx rgba(124, 92, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+.btn-primary-icon {
+  font-size: 26rpx;
+  opacity: 0.85;
 }
 .btn-primary.btn-disabled {
-  background: #c8c8d4;
-  color: #ffffff;
+  background: #d3d3dc;
+  color: #fff;
+  box-shadow: none;
 }
 
 .btn-secondary {
   flex: 1;
   background: #f0eeff;
   color: #5b3cd6;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 500;
-  height: 80rpx;
-  line-height: 80rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   border-radius: 14rpx;
   border: none;
 }
 .btn-secondary + .btn-secondary {
-  margin-left: 20rpx;
+  margin-left: 16rpx;
 }
 
 .result-meta {
-  margin-top: 20rpx;
-  color: #8a8a99;
+  margin-top: 16rpx;
+  color: #5a5a6e;
   font-size: 24rpx;
   text-align: center;
 }
+.result-strong {
+  color: #1f1f23;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 .stale-hint {
-  margin-top: 12rpx;
+  margin-top: 10rpx;
   color: #ff9333;
   font-size: 22rpx;
   text-align: center;
 }
 
-/* 预览 */
+/* -------- 预览 -------- */
 .preview-card {
-  padding: 24rpx 16rpx;
+  padding: 24rpx 20rpx 20rpx;
+}
+.preview-subtitle {
+  font-size: 24rpx;
+  color: #6f6f80;
+  margin-bottom: 16rpx;
+  font-variant-numeric: tabular-nums;
 }
 .preview-empty {
   text-align: center;
   color: #b0b0c0;
   font-size: 26rpx;
-  padding: 60rpx 0;
-}
-.preview-area {
-  width: 100%;
-  height: 800rpx;
+  padding: 80rpx 0;
   background: #fafafd;
-  border-radius: 12rpx;
+  border-radius: 14rpx;
+  border: 1rpx dashed #e6e6ee;
+}
+.preview-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12rpx;
+  background:
+    linear-gradient(135deg, #f6f4ff 0%, #f3f7ff 100%);
+  border-radius: 16rpx;
   overflow: hidden;
   position: relative;
 }
-.preview-area-hidden {
+.preview-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(45deg, rgba(0,0,0,0.025) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.025) 75%),
+    linear-gradient(45deg, rgba(0,0,0,0.025) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.025) 75%);
+  background-size: 16rpx 16rpx;
+  background-position: 0 0, 8rpx 8rpx;
+  pointer-events: none;
+}
+/* 未生成时折叠掉视觉占位，但保留 canvas 在 DOM 中（type=2d 不能 display:none） */
+.preview-stage-hidden {
   height: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.preview-stage-hidden::before {
+  display: none;
+}
+.preview-area {
+  background: transparent;
+  border-radius: 8rpx;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 4rpx 18rpx rgba(20, 20, 40, 0.08);
 }
 .preview-mv {
   background: #fff;
@@ -197,31 +310,33 @@
   font-size: 22rpx;
   color: #a0a0b0;
   font-weight: normal;
-  margin-left: 12rpx;
 }
 
+/* -------- 工具按钮行 -------- */
 .action-row {
   display: flex;
-  margin-top: 20rpx;
+  margin-top: 16rpx;
   padding: 0 8rpx;
 }
 .btn-tool {
   flex: 1;
   background: #fff;
   color: #5b3cd6;
-  font-size: 26rpx;
+  font-size: 24rpx;
   font-weight: 500;
-  height: 72rpx;
-  line-height: 72rpx;
+  height: 68rpx;
+  line-height: 68rpx;
   border-radius: 12rpx;
   border: 2rpx solid #d6d0ff;
+  padding: 0 12rpx;
 }
 .btn-tool + .btn-tool {
-  margin-left: 16rpx;
+  margin-left: 14rpx;
 }
 .btn-tool-active {
   background: #f0eeff;
   color: #5b3cd6;
+  border-color: #b4a8ff;
 }
 .btn-tool-disabled {
   color: #c0c0cc;
@@ -231,10 +346,11 @@
   text-align: center;
   color: #a0a0b0;
   font-size: 22rpx;
-  margin-top: 8rpx;
+  margin-top: 10rpx;
+  padding: 0 8rpx;
 }
 
-/* 选色面板 */
+/* -------- 选色面板 -------- */
 .picker-mask {
   position: fixed;
   inset: 0;
@@ -255,11 +371,12 @@
   bottom: 0;
   background: #fff;
   border-radius: 24rpx 24rpx 0 0;
-  padding: 28rpx 24rpx 32rpx;
+  padding: 24rpx 24rpx 24rpx;
   transform: translateY(100%);
   transition: transform 0.25s ease;
   z-index: 101;
-  max-height: 70vh;
+  max-height: 72vh;
+  box-shadow: 0 -8rpx 32rpx rgba(20, 20, 40, 0.08);
 }
 .picker-sheet-on {
   transform: translateY(0);
@@ -287,7 +404,7 @@
   padding: 4rpx 12rpx;
 }
 .picker-grid {
-  max-height: 60vh;
+  max-height: 56vh;
 }
 .picker-grid-inner {
   display: flex;
@@ -299,14 +416,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8rpx 4rpx;
+  padding: 10rpx 4rpx;
 }
 .picker-swatch {
   width: 64rpx;
   height: 64rpx;
   border-radius: 50%;
-  border: 2rpx solid rgba(0,0,0,0.1);
+  border: 2rpx solid rgba(0,0,0,0.08);
   margin-bottom: 6rpx;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,0.05);
 }
 .picker-key {
   font-size: 18rpx;
@@ -314,7 +432,7 @@
   text-align: center;
 }
 
-/* 色板用量条 */
+/* -------- 色板用量条 -------- */
 .usage-section {
   margin-top: 24rpx;
   padding: 0 8rpx;
@@ -333,6 +451,7 @@
 }
 .usage-scroll {
   white-space: nowrap;
+  width: 100%;
 }
 .usage-strip {
   display: inline-flex;
@@ -343,9 +462,12 @@
   align-items: center;
   background: #f4f4f8;
   border-radius: 999rpx;
-  padding: 8rpx 16rpx 8rpx 8rpx;
+  padding: 8rpx 18rpx 8rpx 8rpx;
   margin-right: 12rpx;
   font-size: 22rpx;
+}
+.usage-chip:active {
+  background: #ecebf3;
 }
 .usage-swatch {
   width: 32rpx;
@@ -361,15 +483,16 @@
 .usage-count {
   color: #8a8a99;
   margin-left: 8rpx;
+  font-variant-numeric: tabular-nums;
 }
 
 .export-row {
   display: flex;
-  margin-top: 24rpx;
+  margin-top: 20rpx;
   padding: 0 8rpx;
 }
 
-/* 离屏 canvas 容器：移出可视区，避免影响布局 */
+/* -------- 离屏 canvas -------- */
 .offscreen {
   position: fixed;
   left: -9999px;
@@ -382,6 +505,63 @@
 .footer {
   text-align: center;
   color: #b0b0c0;
+  font-size: 20rpx;
+  padding: 24rpx 0 8rpx;
+}
+
+/* -------- 导出选项 -------- */
+.export-opts {
+  margin-top: 8rpx;
+  padding: 0 4rpx;
+}
+.export-opt-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-top: 1rpx solid #f0f0f5;
+}
+.export-opt-row:first-child {
+  border-top: none;
+}
+.export-opt-label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-right: 16rpx;
+}
+.export-opt-name {
+  color: #1f1f23;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+.export-opt-desc {
+  color: #a0a0b0;
   font-size: 22rpx;
-  padding: 32rpx 0 16rpx;
+  margin-top: 4rpx;
+}
+.export-confirm-btn {
+  margin-top: 28rpx;
+}
+.picker-color-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  margin-right: 6rpx;
+  border: 1rpx solid rgba(0,0,0,0.18);
+}
+
+/* -------- 响应式：小屏（iPhone SE 等 windowWidth ≤ 320px） -------- */
+@media (max-width: 320px) {
+  .page { padding: 12rpx 20rpx 24rpx; }
+  .card { padding: 20rpx 20rpx 24rpx; margin-bottom: 16rpx; }
+  .upload-zone { padding: 36rpx 18rpx; }
+  .thumb { height: 280rpx; }
+  .btn-primary { height: 80rpx; line-height: 80rpx; font-size: 28rpx; }
+}
+
+/* -------- 响应式：大屏（iPad / Plus / Pro Max） -------- */
+@media (min-width: 480px) {
+  .page { padding: 24rpx 40rpx 40rpx; }
+  .card { border-radius: 24rpx; padding: 32rpx 32rpx 36rpx; }
 }

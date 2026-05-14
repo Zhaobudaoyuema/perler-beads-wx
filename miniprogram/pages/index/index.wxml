@@ -1,14 +1,17 @@
-<view class="page">
-  <!-- 顶部品牌区 -->
+<view class="page" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
+  <!-- 顶部品牌区（紧凑版，与导航栏标题协同） -->
   <view class="hero">
-    <view class="hero-title">拼豆图纸生成器</view>
     <view class="hero-sub">任意图片 → 拼豆底稿，一键生成</view>
   </view>
 
   <!-- 步骤一：选图 -->
   <view class="card">
-    <view class="card-title">1. 选择图片</view>
-    <view class="upload-zone" bindtap="onChooseImage">
+    <view class="step-head">
+      <view class="step-index">1</view>
+      <view class="step-title">选择图片</view>
+      <view wx:if="{{imageInfo}}" class="step-meta">{{imageInfo.width}} × {{imageInfo.height}} px</view>
+    </view>
+    <view class="upload-zone {{tempFilePath ? 'upload-zone-filled' : ''}}" bindtap="onChooseImage">
       <block wx:if="{{tempFilePath}}">
         <image class="thumb" src="{{tempFilePath}}" mode="aspectFit"></image>
         <view class="thumb-hint">点击重新选择</view>
@@ -19,26 +22,26 @@
         <view class="upload-sub">支持相册或拍照</view>
       </block>
     </view>
-    <view wx:if="{{imageInfo}}" class="meta">
-      原图 {{imageInfo.width}} × {{imageInfo.height}} px
-    </view>
   </view>
 
   <!-- 步骤二：配置参数 -->
   <view class="card">
-    <view class="card-title">2. 配置参数</view>
+    <view class="step-head">
+      <view class="step-index">2</view>
+      <view class="step-title">配置参数</view>
+    </view>
 
     <view class="form-row">
       <view class="form-label">色号品牌</view>
       <picker class="picker" range="{{brandNames}}" value="{{brandIndex}}" bindchange="onBrandChange">
-        <view class="picker-value">{{brandNames[brandIndex]}}</view>
+        <view class="picker-value">{{brandNames[brandIndex]}} <text class="picker-arrow">›</text></view>
       </picker>
     </view>
 
     <view class="form-row">
       <view class="form-label">像素化模式</view>
       <picker class="picker" range="{{modeNames}}" value="{{modeIndex}}" bindchange="onModeChange">
-        <view class="picker-value">{{modeNames[modeIndex]}}</view>
+        <view class="picker-value">{{modeNames[modeIndex]}} <text class="picker-arrow">›</text></view>
       </picker>
     </view>
 
@@ -54,10 +57,12 @@
         step="1"
         value="{{gridN}}"
         activeColor="#7c5cff"
-        block-size="22"
+        backgroundColor="#ecebf3"
+        block-color="#7c5cff"
+        block-size="20"
         bindchange="onGridNChange"
       />
-      <view class="form-hint">纵向 M 自动按图片比例计算</view>
+      <view class="form-hint">纵向 M 按图片比例自动计算</view>
     </view>
 
     <view class="form-row form-row-block">
@@ -72,61 +77,70 @@
         step="1"
         value="{{mergeThreshold}}"
         activeColor="#7c5cff"
-        block-size="22"
+        backgroundColor="#ecebf3"
+        block-color="#7c5cff"
+        block-size="20"
         bindchange="onMergeThresholdChange"
       />
-      <view class="form-hint">越大合并越激进，0 表示不合并；推荐 30</view>
+      <view class="form-hint">越大合并越激进，0 不合并；推荐 30</view>
     </view>
   </view>
 
   <!-- 步骤三：生成 -->
-  <view class="card">
-    <view class="card-title">3. 生成图纸</view>
+  <view class="card card-generate">
     <button
       class="btn-primary {{!tempFilePath || processing ? 'btn-disabled' : ''}}"
       disabled="{{!tempFilePath || processing}}"
       bindtap="onGenerate"
     >
+      <text class="btn-primary-icon">✦</text>
       {{processing ? '处理中…' : '生成图纸'}}
     </button>
 
     <view wx:if="{{hasResult}}" class="result-meta">
-      已生成 {{gridN}} × {{gridM}} 格 · 共 {{totalBeads}} 颗豆 · {{usedColorCount}} 种色号
+      已生成 <text class="result-strong">{{gridN}} × {{gridM}}</text> · 共 <text class="result-strong">{{totalBeads}}</text> 颗 · <text class="result-strong">{{usedColorCount}}</text> 种色号
     </view>
     <view wx:if="{{stale}}" class="stale-hint">参数已修改，点击「生成图纸」更新</view>
   </view>
 
   <!-- 预览 + 导出（canvas 始终在 DOM 中，确保 selectorQuery 可用） -->
   <view class="card preview-card">
-    <view class="card-title">
-      <text>预览</text>
-      <text wx:if="{{hasResult}}" class="preview-zoom-hint">双指缩放 · 拖动查看 · 当前 {{previewScale}}x</text>
+    <view class="card-title-row">
+      <view class="card-title">预览</view>
+      <text wx:if="{{hasResult}}" class="preview-zoom-hint">双指缩放 · 当前 {{previewScale}}x</text>
     </view>
+    <view wx:if="{{hasResult}}" class="preview-subtitle">{{previewSubtitle}}</view>
     <view wx:if="{{!hasResult}}" class="preview-empty">生成后在此处查看图纸</view>
-    <movable-area
-      class="preview-area {{hasResult ? '' : 'preview-area-hidden'}}"
-      scale-area
-    >
-      <movable-view
-        class="preview-mv"
-        direction="all"
-        inertia
-        scale
-        scale-min="1"
-        scale-max="4"
-        scale-value="1"
-        bindscale="onPreviewScale"
-        style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
+    <view class="preview-stage {{hasResult ? '' : 'preview-stage-hidden'}}">
+      <movable-area
+        class="preview-area"
+        scale-area
+        style="width:{{previewAreaW}}px; height:{{previewAreaH}}px;"
       >
-        <canvas
-          type="2d"
-          id="previewCanvas"
-          class="preview-canvas"
+        <movable-view
+          class="preview-mv"
+          direction="all"
+          inertia
+          scale
+          scale-min="1"
+          scale-max="6"
+          scale-value="1"
+          bindscale="onPreviewScale"
           style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
-          bindtouchstart="onPreviewTouch"
-        ></canvas>
-      </movable-view>
-    </movable-area>
+        >
+          <canvas
+            type="2d"
+            id="previewCanvas"
+            class="preview-canvas"
+            style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
+            bindtouchstart="onPreviewTouchStart"
+            bindtouchmove="onPreviewTouchMove"
+            bindtouchend="onPreviewTouchEnd"
+            bindtouchcancel="onPreviewTouchCancel"
+          ></canvas>
+        </movable-view>
+      </movable-area>
+    </view>
 
     <view class="action-row" wx:if="{{hasResult}}">
       <button class="btn-tool {{bgRemoved ? 'btn-tool-active' : ''}}" bindtap="onToggleBgRemove">
@@ -135,7 +149,6 @@
       <button class="btn-tool" bindtap="onResetExclude">恢复已排除</button>
     </view>
 
-    <!-- 编辑工具栏 -->
     <view class="action-row" wx:if="{{hasResult}}">
       <button class="btn-tool {{eraseMode ? 'btn-tool-active' : ''}}" bindtap="onToggleEraseMode">
         {{eraseMode ? '退出擦除' : '擦除模式'}}
@@ -143,16 +156,16 @@
       <button class="btn-tool {{canUndo ? '' : 'btn-tool-disabled'}}" bindtap="onUndo">撤销编辑</button>
     </view>
     <view wx:if="{{hasResult}}" class="edit-hint">
-      点击格子可{{eraseMode ? '擦除' : '更改色号'}}；缩放图纸时无效
+      点击格子可{{eraseMode ? '擦除' : '更改色号'}}；缩放图纸时点击无效
     </view>
 
-    <!-- 色板用量条：可点击排除 -->
+    <!-- 色板用量条 -->
     <view class="usage-section" wx:if="{{hasResult && usageList.length}}">
       <view class="usage-title">
-        <text>色板用量（点击排除）</text>
-        <text class="usage-meta">{{usageList.length}} 种 · {{totalBeads}} 颗</text>
+        <text>色板用量</text>
+        <text class="usage-meta">{{usageList.length}} 种 · {{totalBeads}} 颗 · 点击可排除</text>
       </view>
-      <scroll-view class="usage-scroll" scroll-x>
+      <scroll-view class="usage-scroll" scroll-x enhanced show-scrollbar="{{false}}">
         <view class="usage-strip">
           <view
             class="usage-chip"
@@ -171,7 +184,7 @@
     </view>
 
     <view class="export-row" wx:if="{{hasResult}}">
-      <button class="btn-secondary" bindtap="onSavePoster">保存图纸</button>
+      <button class="btn-secondary" bindtap="onOpenExportSheet">保存图纸</button>
       <button class="btn-secondary" bindtap="onSaveList">保存采购清单</button>
     </view>
   </view>
@@ -180,13 +193,81 @@
   <view class="offscreen">
     <canvas type="2d" id="srcCanvas" style="width:{{srcCssW}}px; height:{{srcCssH}}px;"></canvas>
     <canvas type="2d" id="listCanvas" style="width:{{listCssW}}px; height:{{listCssH}}px;"></canvas>
+    <canvas type="2d" id="posterCanvas" style="width:{{posterCssW}}px; height:{{posterCssH}}px;"></canvas>
+    <canvas type="2d" id="exportCanvas" style="width:{{exportCssW}}px; height:{{exportCssH}}px;"></canvas>
   </view>
 
-  <view class="footer">基于 Zippland/perler-beads 移植 · MIT 内核 / AGPL 项目</view>
+  <!-- 导出选项弹层 -->
+  <view class="picker-mask {{exportSheetVisible ? 'picker-mask-on' : ''}}" catchtap="onCloseExportSheet"></view>
+  <view class="picker-sheet {{exportSheetVisible ? 'picker-sheet-on' : ''}}" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
+    <view class="picker-header">
+      <text class="picker-title">导出图纸选项</text>
+      <text class="picker-meta">保存高清版到相册</text>
+      <text class="picker-close" bindtap="onCloseExportSheet">取消</text>
+    </view>
+    <view class="export-opts">
+      <view class="export-opt-row">
+        <view class="export-opt-label">
+          <text class="export-opt-name">显示坐标轴</text>
+          <text class="export-opt-desc">便于按行列查找</text>
+        </view>
+        <switch checked="{{exportOpts.showCoordinates}}" color="#7c5cff" data-key="showCoordinates" bindchange="onExportOptToggle"/>
+      </view>
+      <view class="export-opt-row">
+        <view class="export-opt-label">
+          <text class="export-opt-name">粗网格分隔线</text>
+          <text class="export-opt-desc">每 N 格一条</text>
+        </view>
+        <switch checked="{{exportOpts.showGrid}}" color="#7c5cff" data-key="showGrid" bindchange="onExportOptToggle"/>
+      </view>
+      <view class="export-opt-row" wx:if="{{exportOpts.showGrid}}">
+        <view class="export-opt-label">
+          <text class="export-opt-name">网格间隔</text>
+          <text class="export-opt-desc">{{gridIntervalOptions[gridIntervalIndex]}} 格 / 线</text>
+        </view>
+        <picker class="picker" range="{{gridIntervalOptions}}" value="{{gridIntervalIndex}}" bindchange="onGridIntervalChange">
+          <view class="picker-value">{{gridIntervalOptions[gridIntervalIndex]}} <text class="picker-arrow">›</text></view>
+        </picker>
+      </view>
+      <view class="export-opt-row" wx:if="{{exportOpts.showGrid}}">
+        <view class="export-opt-label">
+          <text class="export-opt-name">网格线颜色</text>
+          <text class="export-opt-desc">{{gridColorOptions[gridColorIndex].label}}</text>
+        </view>
+        <picker class="picker" range="{{gridColorLabels}}" value="{{gridColorIndex}}" bindchange="onGridColorChange">
+          <view class="picker-value">
+            <view class="picker-color-dot" style="background:{{gridColorOptions[gridColorIndex].value}}"></view>
+            {{gridColorOptions[gridColorIndex].label}}
+            <text class="picker-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+      <view class="export-opt-row">
+        <view class="export-opt-label">
+          <text class="export-opt-name">cell 内显示色号</text>
+          <text class="export-opt-desc">关闭可让小格更清爽</text>
+        </view>
+        <switch checked="{{exportOpts.showCellNumbers}}" color="#7c5cff" data-key="showCellNumbers" bindchange="onExportOptToggle"/>
+      </view>
+      <view class="export-opt-row">
+        <view class="export-opt-label">
+          <text class="export-opt-name">附带色号统计表</text>
+          <text class="export-opt-desc">底部色块 + 数量</text>
+        </view>
+        <switch checked="{{exportOpts.includeStats}}" color="#7c5cff" data-key="includeStats" bindchange="onExportOptToggle"/>
+      </view>
+    </view>
+    <button class="btn-primary export-confirm-btn" bindtap="onConfirmExport">
+      <text class="btn-primary-icon">↓</text>
+      生成并保存图纸
+    </button>
+  </view>
 
-  <!-- 选色面板（编辑单格用） -->
+  <view class="footer">基于 Zippland/perler-beads 移植 · AGPL</view>
+
+  <!-- 选色面板 -->
   <view class="picker-mask {{pickerVisible ? 'picker-mask-on' : ''}}" catchtap="onClosePicker"></view>
-  <view class="picker-sheet {{pickerVisible ? 'picker-sheet-on' : ''}}">
+  <view class="picker-sheet {{pickerVisible ? 'picker-sheet-on' : ''}}" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
     <view class="picker-header">
       <text class="picker-title">选择色号</text>
       <text class="picker-meta">{{pickerCellInfo}}</text>
