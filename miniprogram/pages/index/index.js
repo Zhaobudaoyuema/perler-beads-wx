@@ -91,6 +91,12 @@ Page({
     gridColorLabels: ['黑色', '深灰', '白色'],
     gridColorIndex: 0,
 
+    // 自定义调色板（B4.2）
+    paletteEditorVisible: false,
+    paletteEditorList: [],   // [{ key, hex, enabled }]
+    paletteEnabledCount: 0,
+    paletteTotalCount: 0,
+
     // 安全区（页面 padding 用，rpx 比较麻烦，直接用 px 注入）
     safeBottom: 0,
     headerNavH: 0
@@ -98,8 +104,168 @@ Page({
 
   onLoad() {
     const g = (app && app.globalData) || {};
+    const updates = { safeBottom: g.safeBottom || 0 };
+    // 读取用户偏好（B4.1）
+    try {
+      const prefs = wx.getStorageSync('user_prefs');
+      if (prefs && typeof prefs === 'object') {
+        if (typeof prefs.brandIndex === 'number' && prefs.brandIndex >= 0 && prefs.brandIndex < brandOptions.length) {
+          updates.brandIndex = prefs.brandIndex;
+        }
+        if (typeof prefs.modeIndex === 'number' && prefs.modeIndex >= 0 && prefs.modeIndex < modeOptions.length) {
+          updates.modeIndex = prefs.modeIndex;
+        }
+        if (typeof prefs.gridN === 'number' && prefs.gridN >= 20 && prefs.gridN <= 120) {
+          updates.gridN = prefs.gridN;
+        }
+        if (typeof prefs.mergeThreshold === 'number' && prefs.mergeThreshold >= 0 && prefs.mergeThreshold <= 50) {
+          updates.mergeThreshold = prefs.mergeThreshold;
+        }
+        if (typeof prefs.gridIntervalIndex === 'number') {
+          updates.gridIntervalIndex = prefs.gridIntervalIndex;
+        }
+        if (typeof prefs.gridColorIndex === 'number') {
+          updates.gridColorIndex = prefs.gridColorIndex;
+        }
+        if (prefs.exportOpts && typeof prefs.exportOpts === 'object') {
+          updates.exportOpts = Object.assign({}, this.data.exportOpts, prefs.exportOpts);
+        }
+      }
+    } catch (e) {
+      console.error('[Prefs] read failed', e);
+    }
+    this.setData(updates);
+  },
+
+  _persistPrefs() {
+    try {
+      wx.setStorageSync('user_prefs', {
+        brandIndex: this.data.brandIndex,
+        modeIndex: this.data.modeIndex,
+        gridN: this.data.gridN,
+        mergeThreshold: this.data.mergeThreshold,
+        gridIntervalIndex: this.data.gridIntervalIndex,
+        gridColorIndex: this.data.gridColorIndex,
+        exportOpts: this.data.exportOpts
+      });
+    } catch (e) {
+      console.error('[Prefs] save failed', e);
+    }
+  },
+
+  // ==================== 自定义调色板（B4.2） ====================
+
+  /**
+   * 读取当前品牌的勾选状态：默认全勾选；以 hex (大写) 为 key
+   */
+  _getPaletteSelections(brand) {
+    if (!brand) return {};
+    try {
+      const sel = wx.getStorageSync('palette_selections_' + brand);
+      return (sel && typeof sel === 'object') ? sel : {};
+    } catch (e) {
+      return {};
+    }
+  },
+
+  /**
+   * 应用勾选规则后的当前品牌色板（B4.2）
+   * 默认（无 selection 记录）= 全勾选
+   * 任一 hex 显式为 false 才会被剔除
+   */
+  _buildActivePalette(brand) {
+    const full = buildPalette(brand);
+    const selections = this._getPaletteSelections(brand);
+    if (!selections || Object.keys(selections).length === 0) return full;
+    return full.filter(p => selections[p.hex.toUpperCase()] !== false);
+  },
+
+  onOpenPaletteEditor() {
+    const brand = brandOptions[this.data.brandIndex].key;
+    const full = buildPalette(brand);
+    if (full.length === 0) {
+      wx.showToast({ title: '当前品牌无可用色板', icon: 'none' });
+      return;
+    }
+    const selections = this._getPaletteSelections(brand);
+    const list = full.map(p => ({
+      key: p.key,
+      hex: p.hex,
+      enabled: selections[p.hex.toUpperCase()] !== false
+    }));
+    const enabledCount = list.filter(p => p.enabled).length;
     this.setData({
-      safeBottom: g.safeBottom || 0
+      paletteEditorVisible: true,
+      paletteEditorList: list,
+      paletteEnabledCount: enabledCount,
+      paletteTotalCount: list.length
+    });
+  },
+
+  onClosePaletteEditor() {
+    this.setData({ paletteEditorVisible: false });
+  },
+
+  onTogglePaletteColor(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    const list = this.data.paletteEditorList.slice();
+    if (!list[idx]) return;
+    list[idx] = Object.assign({}, list[idx], { enabled: !list[idx].enabled });
+    const enabledCount = list.filter(p => p.enabled).length;
+    this.setData({
+      paletteEditorList: list,
+      paletteEnabledCount: enabledCount
+    });
+  },
+
+  onPaletteEditorSelectAll() {
+    const list = this.data.paletteEditorList.map(p => Object.assign({}, p, { enabled: true }));
+    this.setData({
+      paletteEditorList: list,
+      paletteEnabledCount: list.length
+    });
+  },
+
+  onPaletteEditorSelectNone() {
+    const list = this.data.paletteEditorList.map(p => Object.assign({}, p, { enabled: false }));
+    this.setData({
+      paletteEditorList: list,
+      paletteEnabledCount: 0
+    });
+  },
+
+  onPaletteEditorInvert() {
+    const list = this.data.paletteEditorList.map(p => Object.assign({}, p, { enabled: !p.enabled }));
+    const enabledCount = list.filter(p => p.enabled).length;
+    this.setData({
+      paletteEditorList: list,
+      paletteEnabledCount: enabledCount
+    });
+  },
+
+  onPaletteEditorApply() {
+    const brand = brandOptions[this.data.brandIndex].key;
+    const enabledCount = this.data.paletteEnabledCount;
+    if (enabledCount === 0) {
+      wx.showToast({ title: '至少保留 1 个色号', icon: 'none' });
+      return;
+    }
+    const selections = {};
+    this.data.paletteEditorList.forEach(p => {
+      selections[p.hex.toUpperCase()] = !!p.enabled;
+    });
+    try {
+      wx.setStorageSync('palette_selections_' + brand, selections);
+    } catch (e) {
+      console.error('[Palette] save failed', e);
+      wx.showToast({ title: '保存失败', icon: 'none' });
+      return;
+    }
+    this.setData({ paletteEditorVisible: false });
+    this._markStale();
+    wx.showToast({
+      title: '已启用 ' + enabledCount + ' / ' + this.data.paletteTotalCount + ' 色',
+      icon: 'success'
     });
   },
 
@@ -116,18 +282,22 @@ Page({
   onBrandChange(e) {
     this.setData({ brandIndex: Number(e.detail.value) });
     this._markStale();
+    this._persistPrefs();
   },
   onModeChange(e) {
     this.setData({ modeIndex: Number(e.detail.value) });
     this._markStale();
+    this._persistPrefs();
   },
   onGridNChange(e) {
     this.setData({ gridN: Number(e.detail.value) });
     this._markStale();
+    this._persistPrefs();
   },
   onMergeThresholdChange(e) {
     this.setData({ mergeThreshold: Number(e.detail.value) });
     this._markStale();
+    this._persistPrefs();
   },
 
   _markStale() {
@@ -217,11 +387,11 @@ Page({
       const aspect = imageData.height / imageData.width;
       const M = Math.max(1, Math.round(N * aspect));
 
-      // 3. 构建调色板
+      // 3. 构建调色板（应用自定义勾选）
       const brand = brandOptions[this.data.brandIndex].key;
-      const palette = buildPalette(brand);
+      const palette = this._buildActivePalette(brand);
       if (palette.length === 0) {
-        throw new Error('当前品牌无可用色板');
+        throw new Error('当前品牌无可用色板（请检查自定义调色板是否全部禁用）');
       }
       const fallback = getFallbackColor(palette);
 
@@ -322,6 +492,9 @@ Page({
       hasResult: true,
       stale: false
     });
+
+    // 预热分享卡面（不阻塞）
+    this._genShareCover().then(p => { if (p) this._shareCoverPath = p; });
   },
 
   // ==================== 手动逐格编辑 ====================
@@ -702,9 +875,9 @@ Page({
     this.setData({ processing: true });
     wx.showLoading({ title: '重映射…', mask: true });
     try {
-      // 重新构建 palette（剔除已排除色）
-      const fullPalette = buildPalette(this._currentBrand);
-      const filtered = fullPalette.filter(p => !this._excludedHex.has(p.hex.toUpperCase()));
+      // 重新构建 palette（应用自定义勾选 + 剔除已排除色）
+      const activePalette = this._buildActivePalette(this._currentBrand);
+      const filtered = activePalette.filter(p => !this._excludedHex.has(p.hex.toUpperCase()));
       if (filtered.length === 0) {
         throw new Error('剩余色板为空');
       }
@@ -777,8 +950,8 @@ Page({
     this.setData({ processing: true });
     wx.showLoading({ title: '重映射…', mask: true });
     try {
-      const fullPalette = buildPalette(this._currentBrand);
-      const filtered = fullPalette.filter(p => !this._excludedHex.has(p.hex.toUpperCase()));
+      const activePalette = this._buildActivePalette(this._currentBrand);
+      const filtered = activePalette.filter(p => !this._excludedHex.has(p.hex.toUpperCase()));
       if (filtered.length === 0) throw new Error('剩余色板为空');
       const fallback = getFallbackColor(filtered);
 
@@ -821,9 +994,9 @@ Page({
 
   _refreshExcludedList() {
     const set = this._excludedHex || new Set();
-    const fullPalette = this._currentBrand ? buildPalette(this._currentBrand) : [];
+    const activePalette = this._currentBrand ? this._buildActivePalette(this._currentBrand) : [];
     const keyByHex = {};
-    fullPalette.forEach(p => { keyByHex[p.hex.toUpperCase()] = p.key; });
+    activePalette.forEach(p => { keyByHex[p.hex.toUpperCase()] = p.key; });
     const list = [];
     set.forEach(hexUpper => {
       list.push({
@@ -1169,14 +1342,17 @@ Page({
     const value = e.detail.value;
     if (!key) return;
     this.setData({ ['exportOpts.' + key]: value });
+    this._persistPrefs();
   },
 
   onGridIntervalChange(e) {
     this.setData({ gridIntervalIndex: Number(e.detail.value) });
+    this._persistPrefs();
   },
 
   onGridColorChange(e) {
     this.setData({ gridColorIndex: Number(e.detail.value) });
+    this._persistPrefs();
   },
 
   async onConfirmExport() {
@@ -1431,17 +1607,61 @@ Page({
 
   // ==================== 分享 ====================
 
+  /**
+   * 生成分享卡片图（从已渲染的 previewCanvas 抓临时路径）
+   *
+   * @returns Promise<string|null>
+   */
+  _genShareCover() {
+    return new Promise(resolve => {
+      const canvas = this._previewDraw && this._previewDraw.canvas;
+      if (!canvas) {
+        resolve(null);
+        return;
+      }
+      try {
+        wx.canvasToTempFilePath({
+          canvas,
+          fileType: 'jpg',
+          quality: 0.85,
+          success: r => resolve(r.tempFilePath || null),
+          fail: () => resolve(null)
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  },
+
   onShareAppMessage() {
-    return {
+    const share = {
       title: '我用拼豆图纸生成器做了个图纸',
       path: '/pages/index/index'
     };
+    // 微信小程序支持 imageUrl 传 Promise（基础库 ≥ 2.27.1），通过 promise 字段实现
+    // 如果当前已有作品，则用作品图作为分享封面
+    if (this.data.hasResult) {
+      share.promise = this._genShareCover().then(p => {
+        if (p) return Object.assign({}, share, { imageUrl: p });
+        return share;
+      });
+    }
+    return share;
   },
 
   onShareTimeline() {
-    return {
+    const share = {
       title: '拼豆图纸生成器 — 任意图片一键生成拼豆底稿',
       query: ''
     };
+    // 时刻不支持 promise，但若已有作品先把临时文件 path 同步给上次缓存的 _shareCoverPath
+    if (this.data.hasResult && this._shareCoverPath) {
+      share.imageUrl = this._shareCoverPath;
+    }
+    // 顺便预热下次分享朋友圈的封面
+    if (this.data.hasResult) {
+      this._genShareCover().then(p => { if (p) this._shareCoverPath = p; });
+    }
+    return share;
   }
 });

@@ -39,6 +39,14 @@
     </view>
 
     <view class="form-row">
+      <view class="form-label">自定义色板</view>
+      <view class="palette-edit-btn" bindtap="onOpenPaletteEditor">
+        <text>勾选启用色号</text>
+        <text class="picker-arrow">›</text>
+      </view>
+    </view>
+
+    <view class="form-row">
       <view class="form-label">像素化模式</view>
       <picker class="picker" range="{{modeNames}}" value="{{modeIndex}}" bindchange="onModeChange">
         <view class="picker-value">{{modeNames[modeIndex]}} <text class="picker-arrow">›</text></view>
@@ -293,6 +301,41 @@
   </view>
 
   <view class="footer">基于 Zippland/perler-beads 移植 · AGPL</view>
+
+  <!-- 自定义调色板编辑器 -->
+  <view class="picker-mask {{paletteEditorVisible ? 'picker-mask-on' : ''}}" catchtap="onClosePaletteEditor"></view>
+  <view class="picker-sheet {{paletteEditorVisible ? 'picker-sheet-on' : ''}}" style="padding-bottom: calc(32rpx + {{safeBottom}}px);">
+    <view class="picker-header">
+      <text class="picker-title">自定义调色板</text>
+      <text class="picker-meta">{{paletteEnabledCount}} / {{paletteTotalCount}} 启用</text>
+      <text class="picker-close" bindtap="onClosePaletteEditor">取消</text>
+    </view>
+    <view class="palette-edit-actions">
+      <view class="palette-edit-action" bindtap="onPaletteEditorSelectAll">全选</view>
+      <view class="palette-edit-action" bindtap="onPaletteEditorSelectNone">全不选</view>
+      <view class="palette-edit-action" bindtap="onPaletteEditorInvert">反选</view>
+    </view>
+    <scroll-view class="picker-grid" scroll-y>
+      <view class="picker-grid-inner">
+        <view
+          class="picker-color palette-edit-cell {{item.enabled ? 'palette-edit-cell-on' : 'palette-edit-cell-off'}}"
+          wx:for="{{paletteEditorList}}"
+          wx:key="hex"
+          wx:for-index="idx"
+          data-idx="{{idx}}"
+          bindtap="onTogglePaletteColor"
+        >
+          <view class="picker-swatch" style="background:{{item.hex}}"></view>
+          <text class="picker-key">{{item.key}}</text>
+          <view class="palette-edit-tick" wx:if="{{item.enabled}}">✓</view>
+        </view>
+      </view>
+    </scroll-view>
+    <button class="btn-primary export-confirm-btn" bindtap="onPaletteEditorApply">
+      <text class="btn-primary-icon">✓</text>
+      应用（{{paletteEnabledCount}} 色）
+    </button>
+  </view>
 
   <!-- 选色面板 -->
   <view class="picker-mask {{pickerVisible ? 'picker-mask-on' : ''}}" catchtap="onClosePicker"></view>

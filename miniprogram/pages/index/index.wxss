@@ -599,6 +599,68 @@ page {
   border: 1rpx solid rgba(0,0,0,0.18);
 }
 
+/* -------- 自定义调色板编辑器 -------- */
+.palette-edit-btn {
+  color: #1f1f23;
+  font-size: 26rpx;
+  padding: 8rpx 16rpx;
+  background: #f4f4f8;
+  border-radius: 12rpx;
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+}
+.palette-edit-actions {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+  padding: 0 4rpx;
+}
+.palette-edit-action {
+  flex: 1;
+  text-align: center;
+  font-size: 24rpx;
+  color: #5b3cd6;
+  background: #f0eeff;
+  padding: 12rpx 0;
+  border-radius: 12rpx;
+}
+.palette-edit-action:active {
+  background: #e2dcff;
+}
+.palette-edit-cell {
+  position: relative;
+  transition: opacity 0.15s;
+}
+.palette-edit-cell-off {
+  opacity: 0.32;
+}
+.palette-edit-cell-off .picker-swatch {
+  position: relative;
+}
+.palette-edit-cell-off .picker-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 47%, #ff5f6d 47%, #ff5f6d 53%, transparent 53%);
+  border-radius: 50%;
+}
+.palette-edit-tick {
+  position: absolute;
+  top: 4rpx;
+  right: 14rpx;
+  width: 26rpx;
+  height: 26rpx;
+  border-radius: 50%;
+  background: #1aaa55;
+  color: #fff;
+  font-size: 18rpx;
+  font-weight: 700;
+  text-align: center;
+  line-height: 26rpx;
+  box-shadow: 0 2rpx 6rpx rgba(26, 170, 85, 0.4);
+}
+
 /* -------- 响应式：小屏（iPhone SE 等 windowWidth ≤ 320px） -------- */
 @media (max-width: 320px) {
   .page { padding: 12rpx 20rpx 24rpx; }
