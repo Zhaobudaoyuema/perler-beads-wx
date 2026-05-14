@@ -59,6 +59,24 @@
       />
       <view class="form-hint">纵向 M 自动按图片比例计算</view>
     </view>
+
+    <view class="form-row form-row-block">
+      <view class="form-row-line">
+        <view class="form-label">杂色合并阈值</view>
+        <view class="form-value">{{mergeThreshold === 0 ? '关闭' : mergeThreshold}}</view>
+      </view>
+      <slider
+        class="slider"
+        min="0"
+        max="50"
+        step="1"
+        value="{{mergeThreshold}}"
+        activeColor="#7c5cff"
+        block-size="22"
+        bindchange="onMergeThresholdChange"
+      />
+      <view class="form-hint">越大合并越激进，0 表示不合并；推荐 30</view>
+    </view>
   </view>
 
   <!-- 步骤三：生成 -->
@@ -89,6 +107,37 @@
         style="width:{{previewCssW}}px; height:{{previewCssH}}px;"
       ></canvas>
     </scroll-view>
+
+    <view class="action-row" wx:if="{{hasResult}}">
+      <button class="btn-tool {{bgRemoved ? 'btn-tool-active' : ''}}" bindtap="onToggleBgRemove">
+        {{bgRemoved ? '撤回去背景' : '一键去背景'}}
+      </button>
+      <button class="btn-tool" bindtap="onResetExclude">恢复已排除</button>
+    </view>
+
+    <!-- 色板用量条：可点击排除 -->
+    <view class="usage-section" wx:if="{{hasResult && usageList.length}}">
+      <view class="usage-title">
+        <text>色板用量（点击排除）</text>
+        <text class="usage-meta">{{usageList.length}} 种 · {{totalBeads}} 颗</text>
+      </view>
+      <scroll-view class="usage-scroll" scroll-x>
+        <view class="usage-strip">
+          <view
+            class="usage-chip"
+            wx:for="{{usageList}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            data-hex="{{item.color}}"
+            bindtap="onTapUsageChip"
+          >
+            <view class="usage-swatch" style="background:{{item.color}}"></view>
+            <text class="usage-key">{{item.key}}</text>
+            <text class="usage-count">×{{item.count}}</text>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
 
     <view class="export-row" wx:if="{{hasResult}}">
       <button class="btn-secondary" bindtap="onSavePoster">保存图纸</button>

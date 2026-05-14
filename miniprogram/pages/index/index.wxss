@@ -187,6 +187,79 @@
   display: block;
 }
 
+.action-row {
+  display: flex;
+  margin-top: 20rpx;
+  padding: 0 8rpx;
+}
+.btn-tool {
+  flex: 1;
+  background: #fff;
+  color: #5b3cd6;
+  font-size: 26rpx;
+  font-weight: 500;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 12rpx;
+  border: 2rpx solid #d6d0ff;
+}
+.btn-tool + .btn-tool {
+  margin-left: 16rpx;
+}
+.btn-tool-active {
+  background: #f0eeff;
+  color: #5b3cd6;
+}
+
+/* 色板用量条 */
+.usage-section {
+  margin-top: 24rpx;
+  padding: 0 8rpx;
+}
+.usage-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 26rpx;
+  color: #5a5a6e;
+  margin-bottom: 12rpx;
+}
+.usage-meta {
+  font-size: 22rpx;
+  color: #a0a0b0;
+}
+.usage-scroll {
+  white-space: nowrap;
+}
+.usage-strip {
+  display: inline-flex;
+  padding: 4rpx 0 8rpx;
+}
+.usage-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #f4f4f8;
+  border-radius: 999rpx;
+  padding: 8rpx 16rpx 8rpx 8rpx;
+  margin-right: 12rpx;
+  font-size: 22rpx;
+}
+.usage-swatch {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 50%;
+  margin-right: 10rpx;
+  border: 1rpx solid rgba(0,0,0,0.12);
+}
+.usage-key {
+  color: #1f1f23;
+  font-weight: 600;
+}
+.usage-count {
+  color: #8a8a99;
+  margin-left: 8rpx;
+}
+
 .export-row {
   display: flex;
   margin-top: 24rpx;
